@@ -468,33 +468,60 @@ function dbJson() {
 function save() {
   if (stale()) return conflict();
   if (badRaw !== null) { toast('ข้อมูลเดิมที่อ่านไม่ได้ยังไม่มีสำเนา (พื้นที่ในเครื่องไม่พอ) จึงยังบันทึกไม่ได้ เพื่อไม่ให้ทับของเดิม กด "⋯" แล้วเลือก "ส่งออกข้อมูลเดิมที่อ่านไม่ได้" ก่อน', 8000); return false; }
-  try { localStorage.setItem(KEY, dbJson()); }
-  catch { toast('บันทึกลงเครื่องไม่สำเร็จ พื้นที่เต็มหรือถูกปิดไว้ ข้อมูลล่าสุดยังไม่ถูกเก็บ กรุณาสำรองข้อมูลทันที', 7000); return false; }
+  const json = dbJson(), put = () => { try { localStorage.setItem(KEY, json); return true; } catch { return false; } };
+  if (!put()) {
+    // Storage full: make room from the automatic safety copy (first its sales snapshots, then the whole copy), never from the data.
+    // While an operation that this copy protects is running (POS import, restore, merge ...), ask before giving up its "undo".
+    const pv = prevInfo(), slim = pv && !pv.noSnaps && pv.data.snaps && pv.data.snaps.length;
+    const ask = !pv || !prevGuard || confirm('พื้นที่ในเครื่องไม่พอเก็บทั้งข้อมูลและสำเนาย้อนกลับ\nทำรายการนี้ต่อโดยลดหรือลบสำเนาย้อนกลับไหม? ถ้าทำต่ออาจย้อนกลับไม่ได้\n(แนะนำให้กดยกเลิก แล้วสำรองข้อมูลเป็นไฟล์ก่อน)');
+    let saved = false, lost = '';
+    if (pv && ask && slim) { try { localStorage.setItem(PREV_KEY, JSON.stringify({ ...pv, noSnaps: true, data: { ...pv.data, snaps: [] } })); lost = 'snaps'; saved = put(); } catch {} }
+    if (pv && ask && !saved) { try { localStorage.removeItem(PREV_KEY); lost = 'all'; } catch {} saved = put(); }
+    if (!saved) { toast('บันทึกลงเครื่องไม่สำเร็จ พื้นที่เต็มหรือถูกปิดไว้ ข้อมูลล่าสุดยังไม่ถูกเก็บ กรุณาสำรองข้อมูลทันที', 7000); return false; }
+    toast(lost === 'all' ? 'พื้นที่ในเครื่องเต็ม ระบบลบสำเนาย้อนกลับอัตโนมัติเพื่อให้บันทึกได้ (ย้อนกลับไม่ได้แล้ว) กรุณาสำรองข้อมูลเป็นไฟล์'
+      : 'พื้นที่ในเครื่องใกล้เต็ม สำเนาย้อนกลับอัตโนมัติจะไม่รวมภาพสต็อกแล้ว กรุณาสำรองข้อมูลเป็นไฟล์', 8000);
+  }
   const r = uid();
   try { localStorage.setItem(REV_KEY, r); myRev = r; } catch { try { localStorage.removeItem(REV_KEY); } catch {} myRev = null; } // a missing stamp still differs from every other window's
   return true;
 }
 // Load what another window saved. Open forms stay open (their save then applies to the fresh data); previews built on the old data are closed.
 function syncFromStorage() {
-  const r = readRev(); if (r === undefined || r === myRev) return;
+  const r = readRev(); if (r === undefined || r === myRev) return false;
   myRev = r; db = load();
   if (mergePending) { mergePending = null; closeLayer(2); }
   if (posPlan && !$('#l2').hidden && $('#l2 [data-act=posgo]')) { posPlan = null; closeLayer(2); }
   render();
   if (!$('#l1').hidden) { if (ui.open) renderDetail(); else if (ui.cust) renderCustDetail(); else if (ui.sdet) renderSalesDetail(); }
   loadImgs(false).catch(() => {});
+  return true;
 }
-window.addEventListener('storage', e => { if (e.key === REV_KEY) { syncFromStorage(); toast('อัปเดตข้อมูลที่แก้จากหน้าต่างอื่นแล้ว'); } });
+// (an event can also arrive for a change this page already loaded, e.g. right after a reload: stay quiet then)
+window.addEventListener('storage', e => { if (e.key === REV_KEY && syncFromStorage()) toast('อัปเดตข้อมูลที่แก้จากหน้าต่างอื่นแล้ว'); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromStorage(); });
 window.addEventListener('pageshow', syncFromStorage);
 // one automatic safety copy of the data (without photos) before anything destructive
 // Tries the full copy first; if the browser is short on space it retries without the sales snapshots (noSnaps) so the copy still fits.
+// prevGuard is set while the operation that just stored the copy runs: every such operation saves synchronously right after
+// keepPrev (no await in between), so clearing it in a microtask covers exactly that operation.
+let prevGuard = false;
 function keepPrev(why) {
   const t = new Date().toISOString();
   for (const noSnaps of [false, true]) {
-    try { localStorage.setItem(PREV_KEY, JSON.stringify({ t, why, noSnaps, data: noSnaps ? { ...db, snaps: [] } : db })); return true; } catch {}
+    try {
+      localStorage.setItem(PREV_KEY, JSON.stringify({ t, why, noSnaps, data: noSnaps ? { ...db, snaps: [] } : db }));
+      prevGuard = true; queueMicrotask(() => { prevGuard = false; }); return true;
+    } catch {}
   }
   return false;
+}
+// localStorage size, counted in characters: about 5.2 million in Chrome / Firefox, about half that in Safari (iPhone, iPad, Mac)
+const LS_QUOTA = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+  (/Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg|Firefox|FxiOS/.test(navigator.userAgent)) ? 2.6e6 : 5.2e6;
+function lsUse() {
+  const n = k => { try { const v = localStorage.getItem(k); return v ? k.length + v.length : 0; } catch { return 0; } };
+  let all = 0; try { for (let i = 0; i < localStorage.length; i++) all += n(localStorage.key(i)); } catch {}
+  return { all, data: n(KEY), prev: n(PREV_KEY), pct: Math.round(all / LS_QUOTA * 100) };
 }
 // false = the user chose to stop because no safety copy could be stored
 function ensurePrev(why) {
@@ -905,6 +932,7 @@ function menu() {
     ${bad ? `<button class="btn ghost block" data-act="badexport">${icon('down')}ส่งออกข้อมูลเดิมที่อ่านไม่ได้</button>` : ''}
     <button class="btn danger block" data-act="wipe">${icon('trash')}ลบข้อมูลทั้งหมด</button></div>
     <p class="hint">สำรองข้อมูลล่าสุด: <b>${lb ? esc(fmtDT(lb)) : 'ยังไม่เคย'}</b><br>ข้อมูลเก็บอยู่ในเครื่องนี้เท่านั้น ควรสำรองเป็นระยะ โดยเฉพาะก่อนล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง<br>iPhone: เพิ่มไอคอนลงหน้าจอหลัก (ปุ่มแชร์ &gt; เพิ่มไปยังหน้าจอโฮม) เพื่อลดโอกาสที่ Safari ล้างข้อมูล</p>
+    ${(u => `<p class="hint" style="${u.pct >= 70 ? 'color:var(--warn)' : ''}">พื้นที่ข้อมูลหลัก (ไม่รวมรูป): <b>ใช้ไปประมาณ ${u.pct}%</b> (ข้อมูล ${Math.round(u.data / LS_QUOTA * 100)}% · สำเนาย้อนกลับ ${Math.round(u.prev / LS_QUOTA * 100)}%)${u.pct >= 70 ? '<br><b>ใกล้เต็ม</b> สำรองข้อมูลเป็นไฟล์ไว้เสมอ ถ้าเต็ม ระบบจะลดหรือลบสำเนาย้อนกลับเพื่อให้บันทึกต่อได้' : ''}</p>`)(lsUse())}
     <p class="hint" id="stor"></p>`);
   (async () => {
     try {
@@ -1913,6 +1941,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) naviga
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}
 if (badRaw !== null) toast('อ่านข้อมูลเดิมไม่ได้ และพื้นที่ในเครื่องไม่พอจะเก็บสำเนา กด "⋯" แล้วส่งออกข้อมูลเดิมก่อน จากนั้นจึงบันทึกหรือกู้คืนได้', 12000);
 else if (loadNotice) toast('อ่านข้อมูลเดิมไม่ได้ ระบบเก็บสำเนาไว้แล้ว ดูที่เมนู "⋯" เพื่อส่งออกข้อมูลเดิม', 9000);
+else if (lsUse().pct >= 75) toast(`พื้นที่เก็บข้อมูลในเครื่องใช้ไปประมาณ ${lsUse().pct}% ใกล้เต็มแล้ว กรุณาสำรองข้อมูลเป็นไฟล์ (ดูรายละเอียดที่เมนู "⋯")`, 8000);
 else if (db.products.length || db.orders.length) {
   const lb = db.settings.lastBackup, days = lb ? (Date.now() - new Date(lb)) / 864e5 : Infinity;
   if (days > 7) toast(lb ? `ยังไม่ได้สำรองข้อมูลมา ${Math.floor(days)} วัน` : 'ยังไม่เคยสำรองข้อมูล กด "⋯" แล้วเลือกสำรองข้อมูล', 5000);

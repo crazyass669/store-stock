@@ -1,4 +1,4 @@
-﻿const CACHE = 'stock-app-v25';
+﻿const CACHE = 'stock-app-v27';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './xlsx.mini.min.js'];
 
 self.addEventListener('install', e => {

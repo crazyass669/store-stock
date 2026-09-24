@@ -615,6 +615,7 @@ function renderStock() {
   const rows = scope
     .map(p => ({ p, vs: p.variants.filter(v => (!ui.color || v.color === ui.color) && (!ui.size || v.size === ui.size)) }))
     .filter(({ p, vs }) => (!(ui.color || ui.size) || vs.length) && (!q || (p.name + ' ' + p.sku + ' ' + (p.category || '')).toLowerCase().includes(q)));
+  if (ui.cat) rows.sort((a, b) => total(b.vs) - total(a.vs) || a.p.name.localeCompare(b.p.name)); // inside a category: most stock first
 
   const outCount = rows.reduce((n, r) => n + r.vs.filter(v => v.qty === 0).length, 0);
   $('#sub').textContent = ui.cat || ui.color || ui.size ? 'กำลังกรอง: ' + [ui.cat, ui.color, ui.size].filter(Boolean).join(' · ') : (ui.src === 'pos' ? 'สต็อกจาก POS · อัปเดตจากไฟล์' : 'สต็อกที่เพิ่มเอง · ไม่เกี่ยวกับ POS');

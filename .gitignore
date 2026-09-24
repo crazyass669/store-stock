@@ -1,0 +1,7 @@
+# Business data stays on this computer only - never commit or publish these
+*.xlsx
+*.xls
+*.csv
+stock-backup-*.json
+stock-orders-*.csv
+stock-customers-*.csv

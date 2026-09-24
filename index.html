@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="สต็อก">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>สต็อกสินค้า</title>
+<style>
+:root{
+  --bg:#f3f5f9; --surface:#fff; --text:#1a2233; --muted:#6b7588; --line:#e3e7ee;
+  --brand:#2563eb; --brand-ink:#fff; --danger:#dc2626; --ok:#16a34a; --chip:#e9eef8;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0f141c; --surface:#19202b; --text:#e8ecf3; --muted:#93a0b5; --line:#2a3342; --chip:#232d3d; --brand:#5b8cff; --brand-ink:#0b1220; --danger:#f87171; --ok:#4ade80;
+  --shadow:none}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Sarabun","Noto Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.4}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+#app{max-width:640px;margin:0 auto;padding:0 16px calc(96px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(12px + env(safe-area-inset-top)) 0 8px;margin:0 -16px;padding-left:16px;padding-right:16px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+h1{font-size:22px;margin:0}
+.icon-btn{width:40px;height:40px;border-radius:12px;background:var(--surface);box-shadow:var(--shadow);font-size:20px;line-height:1}
+.summary{display:flex;gap:8px;margin:10px 0}
+.stat{flex:1;background:var(--surface);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow)}
+.stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.search{width:100%;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);outline:none}
+.search:focus,.field:focus{border-color:var(--brand)}
+.filters{margin-top:10px}
+.filters .label{font-size:12px;color:var(--muted);margin:6px 0 4px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--chip);font-size:14px;border:1.5px solid transparent;white-space:nowrap}
+.chip.on{border-color:var(--brand);background:var(--surface);font-weight:600}
+.sw{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid rgba(128,128,128,.45);flex:none}
+.list{display:grid;gap:10px;margin-top:12px}
+.card{display:block;width:100%;text-align:left;background:var(--surface);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+.card .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.card .name{font-weight:600;font-size:17px}
+.card small,.muted{color:var(--muted);font-size:13px}
+.qty{text-align:right;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.qty small{display:block;font-weight:400;margin-top:2px}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border-radius:999px;padding:3px 10px 3px 8px;font-size:13px}
+.empty{text-align:center;color:var(--muted);padding:40px 16px}
+.empty .btn{margin-top:12px}
+.fab{position:fixed;right:max(16px,calc(50% - 304px));bottom:calc(20px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;background:var(--brand);color:var(--brand-ink);font-size:32px;box-shadow:0 6px 16px rgba(37,99,235,.4);z-index:6;line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:12px;background:var(--brand);color:var(--brand-ink);font-weight:600}
+.btn.ghost{background:var(--chip);color:var(--text)}
+.btn.danger{background:transparent;color:var(--danger);border:1.5px solid var(--danger)}
+.btn.block{width:100%}
+/* sheets */
+.layer{position:fixed;inset:0;z-index:20;background:rgba(10,15,25,.5);display:flex;align-items:flex-end;justify-content:center}
+.layer[hidden]{display:none}
+.panel{background:var(--bg);width:100%;max-width:640px;max-height:92vh;max-height:92dvh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;animation:up .18s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:.4}}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px 16px 8px}
+.panel-head h2{margin:0;font-size:19px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-body{overflow-y:auto;padding:4px 16px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+.group{background:var(--surface);border-radius:16px;padding:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+.group-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.group-head b{flex:1}
+.group-head .sw{width:20px;height:20px}
+.row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.row .size{width:52px;font-weight:600}
+.step{display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end}
+.step button{width:42px;height:42px;border-radius:12px;background:var(--chip);font-size:22px;line-height:1}
+.step input{width:64px;height:42px;text-align:center;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.step input.zero{color:var(--danger)}
+.x{width:34px;height:34px;color:var(--muted);font-size:20px}
+.mini{font-size:13px;color:var(--brand);font-weight:600;padding:6px 4px}
+.field{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);outline:none}
+.form label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px}
+.inline{display:flex;gap:8px;margin-top:8px}
+.inline .field{flex:1}
+input[type=color]{width:46px;height:46px;padding:2px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+.chips.wrap{flex-wrap:wrap;overflow:visible}
+.actions{display:grid;gap:8px;margin-top:20px}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 16px;border-radius:12px;z-index:50;font-size:14px;max-width:90%}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="bar">
+      <h1>สต็อกสินค้า</h1>
+      <button class="icon-btn" data-act="menu" aria-label="เมนู">⋯</button>
+    </div>
+    <div class="summary" id="summary"></div>
+    <input id="search" class="search" type="search" placeholder="ค้นหาชื่อหรือรหัสสินค้า" autocomplete="off">
+    <div class="filters" id="filters"></div>
+  </header>
+  <main class="list" id="list"></main>
+</div>
+<button class="fab" data-act="newp" aria-label="เพิ่มสินค้า">+</button>
+<div class="layer" id="l1" hidden></div>
+<div class="layer" id="l2" hidden></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script>
+'use strict';
+const KEY = 'stock-app-v1';
+const PRESET_COLORS = [['ดำ','#1f1f1f'],['ขาว','#f5f5f5'],['เทา','#9e9e9e'],['แดง','#e53935'],['ชมพู','#f48fb1'],['ส้ม','#fb8c00'],['เหลือง','#fdd835'],['เขียว','#43a047'],['ฟ้า','#29b6f6'],['น้ำเงิน','#1e40af'],['ม่วง','#8e24aa'],['น้ำตาล','#795548'],['ครีม','#f3e5c8']];
+const PRESET_SIZES = ['XS','S','M','L','XL','2XL','3XL','Free'];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const sizeRank = s => { const i = PRESET_SIZES.indexOf(s); if (i >= 0) return i; const n = parseFloat(s); return isNaN(n) ? 1000 : 100 + n; };
+const bySize = (a, b) => sizeRank(a.size) - sizeRank(b.size) || a.size.localeCompare(b.size);
+const swatch = hex => `<i class="sw" style="background:${esc(hex)}"></i>`;
+
+let db = load();
+const ui = { q: '', color: null, size: null, open: null };
+
+function load() {
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.products)) return d; } catch {}
+  return { products: [] };
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { toast('บันทึกไม่สำเร็จ พื้นที่เก็บข้อมูลเต็มหรือถูกปิดไว้'); }
+}
+const product = id => db.products.find(p => p.id === id);
+const total = vs => vs.reduce((n, v) => n + v.qty, 0);
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.append(t); setTimeout(() => t.remove(), 2200);
+}
+
+/* ---------- main list ---------- */
+function usedColors() {
+  const m = new Map();
+  db.products.forEach(p => p.variants.forEach(v => { if (!m.has(v.color)) m.set(v.color, v.hex); }));
+  return [...m];
+}
+function usedSizes() {
+  const s = new Set();
+  db.products.forEach(p => p.variants.forEach(v => s.add(v.size)));
+  return [...s].sort((a, b) => sizeRank(a) - sizeRank(b) || a.localeCompare(b));
+}
+function render() {
+  // drop filters that no longer match any data
+  if (ui.color && !usedColors().some(([c]) => c === ui.color)) ui.color = null;
+  if (ui.size && !usedSizes().includes(ui.size)) ui.size = null;
+
+  const q = ui.q.trim().toLowerCase();
+  const rows = db.products
+    .map(p => ({ p, vs: p.variants.filter(v => (!ui.color || v.color === ui.color) && (!ui.size || v.size === ui.size)) }))
+    .filter(({ p, vs }) => (!(ui.color || ui.size) || vs.length) && (!q || (p.name + ' ' + p.sku).toLowerCase().includes(q)));
+
+  $('#summary').innerHTML =
+    `<div class="stat"><b>${rows.reduce((n, r) => n + total(r.vs), 0).toLocaleString()}</b><span>ชิ้นทั้งหมด</span></div>` +
+    `<div class="stat"><b>${rows.length.toLocaleString()}</b><span>รายการสินค้า</span></div>`;
+
+  const colors = usedColors(), sizes = usedSizes();
+  $('#filters').innerHTML =
+    (colors.length ? `<div class="label">สี</div><div class="chips">${colors.map(([c, h]) =>
+      `<button class="chip ${ui.color === c ? 'on' : ''}" data-act="fcolor" data-v="${esc(c)}">${swatch(h)}${esc(c)}</button>`).join('')}</div>` : '') +
+    (sizes.length ? `<div class="label">ไซส์</div><div class="chips">${sizes.map(s =>
+      `<button class="chip ${ui.size === s ? 'on' : ''}" data-act="fsize" data-v="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : '');
+
+  if (!db.products.length) {
+    $('#list').innerHTML = `<div class="empty">ยังไม่มีสินค้า<br>กดปุ่ม + เพื่อเพิ่มสินค้าชิ้นแรก<br><button class="btn ghost" data-act="demo">ลองใช้ข้อมูลตัวอย่าง</button></div>`;
+    return;
+  }
+  if (!rows.length) { $('#list').innerHTML = `<div class="empty">ไม่พบสินค้าที่ตรงกับตัวกรอง</div>`; return; }
+
+  $('#list').innerHTML = rows.map(({ p, vs }) => {
+    const groups = new Map();
+    vs.forEach(v => { const g = groups.get(v.color) || { hex: v.hex, n: 0 }; g.n += v.qty; groups.set(v.color, g); });
+    return `<button class="card" data-act="open" data-id="${p.id}">
+      <div class="top"><div><div class="name">${esc(p.name)}</div><small>${esc(p.sku) || 'ไม่มีรหัส'}</small></div>
+      <div class="qty">${total(vs).toLocaleString()}<small>ชิ้น</small></div></div>
+      ${groups.size ? `<div class="pills">${[...groups].map(([c, g]) => `<span class="pill">${swatch(g.hex)}${esc(c)} ${g.n}</span>`).join('')}</div>` : '<div class="pills"><small>ยังไม่มีสี/ไซส์</small></div>'}
+    </button>`;
+  }).join('');
+}
+
+/* ---------- layers ---------- */
+function showLayer(n, title, body, headExtra = '') {
+  const l = $('#l' + n);
+  l.innerHTML = `<div class="panel"><div class="panel-head"><h2>${title}</h2>${headExtra}<button class="icon-btn" data-act="close${n}" aria-label="ปิด">✕</button></div><div class="panel-body">${body}</div></div>`;
+  l.hidden = false;
+}
+function closeLayer(n) { $('#l' + n).hidden = true; $('#l' + n).innerHTML = ''; if (n === 1) { ui.open = null; render(); } }
+
+/* ---------- product detail ---------- */
+function renderDetail() {
+  const p = product(ui.open); if (!p) return closeLayer(1);
+  const old = $('#l1 .panel-body'); const scroll = old ? old.scrollTop : 0;
+  const groups = new Map();
+  p.variants.forEach(v => { if (!groups.has(v.color)) groups.set(v.color, { hex: v.hex, vs: [] }); groups.get(v.color).vs.push(v); });
+
+  const body = `<div class="muted" style="margin-bottom:10px">${esc(p.sku) || 'ไม่มีรหัส'} · รวม <b>${total(p.variants).toLocaleString()}</b> ชิ้น</div>` +
+    ([...groups].map(([c, g]) => `<div class="group">
+      <div class="group-head">${swatch(g.hex)}<b>${esc(c)}</b><span class="muted">${total(g.vs)} ชิ้น</span>
+        <button class="mini" data-act="addv" data-color="${esc(c)}">+ ไซส์</button></div>
+      ${g.vs.sort(bySize).map(v => `<div class="row"><span class="size">${esc(v.size)}</span>
+        <div class="step"><button data-act="dec" data-v="${v.id}" aria-label="ลด">−</button>
+        <input type="number" inputmode="numeric" min="0" value="${v.qty}" class="${v.qty === 0 ? 'zero' : ''}" data-qty="${v.id}">
+        <button data-act="inc" data-v="${v.id}" aria-label="เพิ่ม">+</button></div>
+        <button class="x" data-act="delv" data-v="${v.id}" aria-label="ลบ">✕</button></div>`).join('')}
+    </div>`).join('') || `<div class="empty">ยังไม่มีสี/ไซส์</div>`) +
+    `<div class="actions"><button class="btn block" data-act="addv">+ เพิ่มสี / ไซส์</button></div>`;
+
+  showLayer(1, esc(p.name), body, `<button class="mini" data-act="editp" style="margin-left:auto">แก้ไข</button>`);
+  $('#l1 .panel-body').scrollTop = scroll;
+}
+function setQty(id, fn) {
+  const p = product(ui.open); const v = p && p.variants.find(x => x.id === id); if (!v) return;
+  v.qty = Math.max(0, Math.floor(fn(v.qty)) || 0); save(); renderDetail();
+}
+
+/* ---------- product form ---------- */
+function productForm(p) {
+  showLayer(2, p ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า', `<div class="form">
+    <label>ชื่อสินค้า</label><input id="pf-name" class="field" value="${esc(p?.name)}" placeholder="เช่น เสื้อยืดคอกลม" autocomplete="off">
+    <label>รหัสสินค้า (ไม่บังคับ)</label><input id="pf-sku" class="field" value="${esc(p?.sku)}" placeholder="เช่น TS-001" autocomplete="off">
+    <div class="actions"><button class="btn block" data-act="savep" data-id="${p?.id || ''}">บันทึก</button>
+    ${p ? `<button class="btn danger block" data-act="delp" data-id="${p.id}">ลบสินค้านี้</button>` : ''}</div></div>`);
+  setTimeout(() => $('#pf-name')?.focus(), 50);
+}
+
+/* ---------- variant form ---------- */
+let vf = null;
+function variantForm(color) {
+  const known = new Map(PRESET_COLORS); usedColors().forEach(([c, h]) => known.set(c, h));
+  const sizes = new Set(PRESET_SIZES); usedSizes().forEach(s => sizes.add(s));
+  vf = { colors: known, sizes, pickColor: color && known.has(color) ? color : null, pickSizes: new Set(), qty: 0 };
+  renderVariantForm();
+}
+function renderVariantForm() {
+  const sizeList = [...vf.sizes].sort((a, b) => sizeRank(a) - sizeRank(b) || a.localeCompare(b));
+  showLayer(2, 'เพิ่มสี / ไซส์', `<div class="form">
+    <label>เลือกสี</label>
+    <div class="chips wrap">${[...vf.colors].map(([c, h]) => `<button class="chip ${vf.pickColor === c ? 'on' : ''}" data-act="pcolor" data-v="${esc(c)}">${swatch(h)}${esc(c)}</button>`).join('')}</div>
+    <div class="inline"><input id="cc-name" class="field" placeholder="สีอื่น (พิมพ์ชื่อ)"><input id="cc-hex" type="color" value="#888888"><button class="btn ghost" data-act="addcolor">เพิ่ม</button></div>
+    <label>เลือกไซส์ (เลือกได้หลายอัน)</label>
+    <div class="chips wrap">${sizeList.map(s => `<button class="chip ${vf.pickSizes.has(s) ? 'on' : ''}" data-act="psize" data-v="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+    <div class="inline"><input id="cs-name" class="field" placeholder="ไซส์อื่น เช่น 38 หรือ 100cm"><button class="btn ghost" data-act="addsize">เพิ่ม</button></div>
+    <label>จำนวนเริ่มต้นของแต่ละไซส์</label>
+    <input id="vf-qty" class="field" type="number" inputmode="numeric" min="0" value="${vf.qty}">
+    <div class="actions"><button class="btn block" data-act="savev">บันทึก</button></div></div>`);
+}
+
+/* ---------- menu / backup ---------- */
+function menu() {
+  showLayer(2, 'เมนู', `<div class="actions" style="margin-top:4px">
+    <button class="btn ghost block" data-act="export">สำรองข้อมูล (ดาวน์โหลดไฟล์)</button>
+    <button class="btn ghost block" data-act="import">กู้คืนข้อมูลจากไฟล์</button>
+    <button class="btn danger block" data-act="wipe">ลบข้อมูลทั้งหมด</button></div>
+    <p class="muted">ข้อมูลเก็บอยู่ในเครื่องนี้เท่านั้น ควรสำรองข้อมูลเป็นระยะ โดยเฉพาะก่อนล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง</p>`);
+}
+function demo() {
+  const mk = (name, sku, spec) => ({ id: uid(), name, sku, variants: spec.flatMap(([c, qs]) => {
+    const hex = Object.fromEntries(PRESET_COLORS)[c];
+    return Object.entries(qs).map(([size, qty]) => ({ id: uid(), color: c, hex, size, qty }));
+  }) });
+  db.products.push(
+    mk('เสื้อยืดคอกลม', 'TS-001', [['ขาว', { S: 12, M: 20, L: 15, XL: 6 }], ['ดำ', { S: 8, M: 25, L: 18, XL: 0 }], ['น้ำเงิน', { M: 10, L: 7 }]]),
+    mk('กางเกงยีนส์', 'JN-014', [['น้ำเงิน', { 28: 5, 30: 9, 32: 11, 34: 4 }], ['ดำ', { 30: 6, 32: 8 }]]),
+    mk('หมวกแก๊ป', 'CP-220', [['แดง', { Free: 14 }], ['ดำ', { Free: 22 }], ['ครีม', { Free: 3 }]]));
+  save(); render();
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]');
+  if (!t) { if (e.target.classList.contains('layer')) closeLayer(e.target.id === 'l1' ? 1 : 2); return; }
+  const a = t.dataset.act, v = t.dataset.v;
+  switch (a) {
+    case 'fcolor': ui.color = ui.color === v ? null : v; render(); break;
+    case 'fsize': ui.size = ui.size === v ? null : v; render(); break;
+    case 'open': ui.open = t.dataset.id; renderDetail(); break;
+    case 'close1': closeLayer(1); break;
+    case 'close2': closeLayer(2); break;
+    case 'menu': menu(); break;
+    case 'demo': demo(); break;
+    case 'newp': productForm(null); break;
+    case 'editp': productForm(product(ui.open)); break;
+    case 'savep': {
+      const name = $('#pf-name').value.trim(); if (!name) { toast('กรุณาใส่ชื่อสินค้า'); return; }
+      const sku = $('#pf-sku').value.trim(), id = t.dataset.id;
+      if (id) { const p = product(id); p.name = name; p.sku = sku; }
+      else { const p = { id: uid(), name, sku, variants: [] }; db.products.unshift(p); ui.open = p.id; }
+      save(); closeLayer(2); render(); renderDetail(); break;
+    }
+    case 'delp': {
+      const p = product(t.dataset.id);
+      if (confirm(`ลบ "${p.name}" และสต็อกทั้งหมดของสินค้านี้?`)) { db.products = db.products.filter(x => x !== p); save(); closeLayer(2); closeLayer(1); }
+      break;
+    }
+    case 'inc': setQty(v, n => n + 1); break;
+    case 'dec': setQty(v, n => n - 1); break;
+    case 'delv': {
+      const p = product(ui.open), x = p.variants.find(y => y.id === v);
+      if (confirm(`ลบ ${x.color} ไซส์ ${x.size}?`)) { p.variants = p.variants.filter(y => y !== x); save(); renderDetail(); }
+      break;
+    }
+    case 'addv': variantForm(t.dataset.color); break;
+    case 'pcolor': vf.qty = $('#vf-qty').value; vf.pickColor = v; renderVariantForm(); break;
+    case 'psize': vf.qty = $('#vf-qty').value; vf.pickSizes.has(v) ? vf.pickSizes.delete(v) : vf.pickSizes.add(v); renderVariantForm(); break;
+    case 'addcolor': {
+      const n = $('#cc-name').value.trim(); if (!n) return;
+      const hex = $('#cc-hex').value; vf.qty = $('#vf-qty').value;
+      vf.colors.set(n, hex); vf.pickColor = n; renderVariantForm(); break;
+    }
+    case 'addsize': {
+      const n = $('#cs-name').value.trim(); if (!n) return;
+      vf.qty = $('#vf-qty').value; vf.sizes.add(n); vf.pickSizes.add(n); renderVariantForm(); break;
+    }
+    case 'savev': {
+      if (!vf.pickColor) { toast('กรุณาเลือกสี'); return; }
+      if (!vf.pickSizes.size) { toast('กรุณาเลือกไซส์อย่างน้อย 1 อัน'); return; }
+      const qty = Math.max(0, Math.floor(Number($('#vf-qty').value)) || 0);
+      const p = product(ui.open), hex = vf.colors.get(vf.pickColor);
+      vf.pickSizes.forEach(size => {
+        const ex = p.variants.find(x => x.color === vf.pickColor && x.size === size);
+        if (ex) ex.qty += qty; else p.variants.push({ id: uid(), color: vf.pickColor, hex, size, qty });
+      });
+      save(); closeLayer(2); renderDetail(); break;
+    }
+    case 'export': {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
+      a.download = `stock-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      break;
+    }
+    case 'import': $('#importFile').click(); break;
+    case 'wipe':
+      if (confirm('ลบข้อมูลสินค้าทั้งหมด? ย้อนกลับไม่ได้')) { db = { products: [] }; save(); closeLayer(2); render(); }
+      break;
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.dataset.qty) { const n = Number(e.target.value); setQty(e.target.dataset.qty, () => n); }
+});
+$('#search').addEventListener('input', e => { ui.q = e.target.value; render(); });
+$('#importFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!d || !Array.isArray(d.products)) throw 0;
+    if (!confirm(`กู้คืนข้อมูล ${d.products.length} รายการ? ข้อมูลปัจจุบันจะถูกแทนที่`)) return;
+    db = d; save(); closeLayer(2); render(); toast('กู้คืนข้อมูลแล้ว');
+  } catch { toast('ไฟล์ไม่ถูกต้อง'); }
+});
+
+render();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

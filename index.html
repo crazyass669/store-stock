@@ -692,7 +692,7 @@ function showLayer(n, title, body, headExtra = '', lead = '') {
   l.innerHTML = `<div class="panel"><div class="handle"></div><div class="panel-head">${lead}<div class="ttl">${title}</div>${headExtra}<button class="icon-btn" data-act="close${n}" aria-label="ปิด">${icon('x')}</button></div><div class="panel-body">${body}</div></div>`;
   l.hidden = false;
 }
-function closeLayer(n) { $('#l' + n).hidden = true; $('#l' + n).innerHTML = ''; if (n === 1) { ui.open = null; ui.cust = null; render(); } }
+function closeLayer(n) { if (n === 2) resetOrderPhotos(); $('#l' + n).hidden = true; $('#l' + n).innerHTML = ''; if (n === 1) { ui.open = null; ui.cust = null; render(); } }
 
 /* ---------- product detail ---------- */
 function renderDetail() {
@@ -1460,11 +1460,11 @@ document.addEventListener('click', async e => {
       }
       const oid = of.id || uid();
       if (of.id) Object.assign(db.orders.find(x => x.id === of.id), rec); else db.orders.push({ id: oid, ...rec });
-      save();
+      save(); of.id = oid;
+      const { add: addPh, rm: rmPh } = opend; opend = { add: [], rm: new Set() };
       let phFail = 0;
-      for (const k of opend.rm) await removeImage(k);
-      for (const a of opend.add) { try { await setImage(`o:${oid}:${a.k}`, a.blob); } catch { phFail++; } }
-      resetOrderPhotos();
+      for (const k of rmPh) await removeImage(k);
+      for (const a of addPh) { try { await setImage(`o:${oid}:${a.k}`, a.blob); } catch { phFail++; } URL.revokeObjectURL(a.url); }
       if (phFail) toast(`บันทึกรูปไม่สำเร็จ ${phFail} รูป`, 3500);
       ui.cust = phone; closeLayer(2); render();
       if (a === 'saveo2') {
@@ -1678,7 +1678,7 @@ $('#importFile').addEventListener('change', async e => {
 render();
 (async () => {
   try {
-    for (const [id, blob] of await idbAll()) { if (imgOwned(id)) imgs.set(id, URL.createObjectURL(blob)); else removeImage(id); }
+    for (const [id, blob] of await idbAll()) { if (imgOwned(id)) imgs.set(id, URL.createObjectURL(blob)); else if (!loadNotice) removeImage(id); }
     if (imgs.size) render();
   } catch {}
 })();

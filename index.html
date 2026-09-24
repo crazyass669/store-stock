@@ -145,6 +145,8 @@ svg{width:1em;height:1em;flex:none;stroke:currentColor;fill:none;stroke-width:2;
 .mini{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--brand);font-weight:600;padding:7px 12px;border-radius:99px;background:color-mix(in srgb,var(--brand) 11%,transparent)}
 .row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
 .row.out .szb{background:var(--danger-bg);color:var(--danger)}
+.price{color:var(--ok);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;margin-top:2px}
+.row .vp{font-size:13px;font-weight:700;color:var(--ok);font-variant-numeric:tabular-nums;white-space:nowrap}
 .szb{min-width:52px;text-align:center;font-family:var(--head);font-weight:600;font-size:15px;padding:7px 8px;border-radius:11px;background:var(--chip)}
 .share{flex:1;min-width:12px;height:6px;border-radius:9px;background:var(--chip);overflow:hidden}
 .share i{display:block;height:100%;border-radius:9px;background:var(--brand);opacity:.8}
@@ -421,7 +423,7 @@ function normalizeDb(d) {
   const products = (Array.isArray(d.products) ? d.products : []).filter(p => p && typeof p === 'object').map(p => ({
     ...p, id: uniqId(p.id), name: str(p.name), sku: str(p.sku), category: str(p.category), unit: str(p.unit), pk: p.pk ? str(p.pk) : undefined,
     variants: (Array.isArray(p.variants) ? p.variants : []).filter(v => v && typeof v === 'object').map(v => ({
-      ...v, id: uniqId(v.id), color: str(v.color) || 'ไม่ระบุ', size: str(v.size) || 'Free', qty: Math.max(0, Math.floor(n0(v.qty))),
+      ...v, id: uniqId(v.id), color: str(v.color) || 'ไม่ระบุ', size: str(v.size) || 'Free', qty: Math.max(0, Math.floor(n0(v.qty))), price: n0(v.price) > 0 ? Math.round(n0(v.price) * 100) / 100 : undefined,
       hex: /^#[0-9a-f]{3,8}$/i.test(v.hex) ? v.hex : '#c7cad6', vk: v.vk ? str(v.vk) : undefined, gone: v.gone ? true : undefined }))
   }));
   const orders = (Array.isArray(d.orders) ? d.orders : []).filter(o => o && typeof o === 'object').map(o => ({
@@ -569,6 +571,12 @@ async function saveFile(name, blob) {
 }
 const product = id => db.products.find(p => p.id === id);
 const total = vs => vs.reduce((n, v) => n + v.qty, 0);
+// selling price (POS column E) of a product's variants: "฿300" or "฿300–450" when sizes differ; '' when none is known
+const fmtBaht = n => '฿' + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+function priceText(vs) {
+  const ps = vs.map(v => v.price).filter(x => x > 0); if (!ps.length) return '';
+  const lo = Math.min(...ps), hi = Math.max(...ps); return lo === hi ? fmtBaht(lo) : `${fmtBaht(lo)}–${fmtBaht(hi)}`;
+}
 function toast(msg, ms = 2200) {
   document.querySelectorAll('.toast').forEach(x => x.remove());
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
@@ -820,7 +828,7 @@ function renderStock() {
     return `<button class="card" data-act="open" data-id="${p.id}" style="animation-delay:${Math.min(i, 8) * 30}ms">
       <div class="card-top">${avatar(p, [...groups.values()].map(g => g.hex))}
         <div class="info"><div class="name">${esc(p.name)}</div>
-          <div class="meta">${esc([p.category, p.sku].filter(Boolean).join(' · ')) || 'ไม่มีรหัส'}${vs.length ? ` · ${groups.size} สี · ${sizeSet.length} ไซส์` : ''}</div></div>
+          <div class="meta">${esc([p.category, p.sku].filter(Boolean).join(' · ')) || 'ไม่มีรหัส'}${vs.length ? ` · ${groups.size} สี · ${sizeSet.length} ไซส์` : ''}</div>${priceText(vs) ? `<div class="price">${priceText(vs)}</div>` : ''}</div>
         <div class="qty"><b>${sum.toLocaleString()}</b><small>${esc(p.unit || 'ชิ้น')}</small></div></div>
       ${vs.length ? `<div class="bar">${[...groups.values()].filter(g => g.n > 0).map(g => `<i style="flex:${g.n};background:${esc(g.hex)}"></i>`).join('')}</div>
       <div class="pills">${[...groups].map(([c, g]) => `<span class="pill">${swatch(g.hex)}${esc(c)} <b class="num">${g.n}</b></span>`).join('')}${badge}${vs.some(v => v.gone) ? '<span class="badge mut">ไม่พบใน POS ล่าสุด</span>' : ''}</div>`
@@ -843,15 +851,16 @@ function renderDetail() {
   const old = $('#l1 .panel-body'); const scroll = old ? old.scrollTop : 0;
   const groups = byColor(p.variants), sum = total(p.variants);
   const sizes = new Set(p.variants.map(v => v.size));
+  const ptxt = priceText(p.variants), mixed = new Set(p.variants.map(v => v.price || 0)).size > 1;
 
   const body = (imgs.has(p.id) ? `<img class="banner" src="${imgs.get(p.id)}" alt="${esc(p.name)}">` : '') + `<div class="mini-stats">
       <div><b>${sum.toLocaleString()}</b><span>ชิ้นทั้งหมด</span></div>
       <div><b>${groups.size}</b><span>สี</span></div>
-      <div><b>${sizes.size}</b><span>ไซส์</span></div></div>` +
+      <div><b>${sizes.size}</b><span>ไซส์</span></div></div>` + (ptxt ? `<div class="group" style="padding:10px 14px"><span class="meta">ราคาขาย</span> <b class="price" style="font-size:18px">${ptxt}</b></div>` : '') +
     ([...groups].map(([c, g]) => `<div class="group">
       <div class="group-head">${swatch(g.hex)}<div class="gn"><b>${esc(c)}</b><small>${g.n.toLocaleString()} ชิ้น</small></div>
         <button class="mini" data-act="addv" data-color="${esc(c)}">${icon('plus')}ไซส์</button></div>
-      ${g.vs.sort(bySize).map(v => `<div class="row ${v.qty === 0 ? 'out' : ''}"><span class="szb">${esc(v.size)}</span>
+      ${g.vs.sort(bySize).map(v => `<div class="row ${v.qty === 0 ? 'out' : ''}"><span class="szb">${esc(v.size)}</span>${mixed && v.price ? `<span class="vp">${fmtBaht(v.price)}</span>` : ''}
         <div class="share"><i style="width:${g.n ? Math.round(v.qty / g.n * 100) : 0}%;background:${esc(g.hex)}"></i></div>
         <div class="step"><button data-act="dec" data-v="${v.id}" aria-label="ลด">${icon('minus')}</button>
         <input type="number" inputmode="numeric" min="0" value="${v.qty}" class="${v.qty === 0 ? 'zero' : ''}" data-qty="${v.id}" aria-label="จำนวน">
@@ -1002,7 +1011,8 @@ function parsePosRow(name, category, unit, stock) {
 function planPosImport(aoa) {
   const head = (aoa[0] || []).map(h => String(h ?? '').trim());
   const col = names => head.findIndex(h => names.some(n => h.includes(n)));
-  const c = { name: col(['ชื่อสินค้า']), cat: col(['หมวดหมู่']), unit: col(['หน่วย']), stock: col(['สต๊อก', 'สต็อก']) };
+  const c = { name: col(['ชื่อสินค้า']), cat: col(['หมวดหมู่']), unit: col(['หน่วย']), stock: col(['สต๊อก', 'สต็อก']), price: col(['ราคาขาย']) };
+  if (c.price < 0 && head.length > 4) c.price = 4; // selling price is column E in the GPOS export
   if (c.name < 0 || c.stock < 0) return { error: 'ไม่พบคอลัมน์ "ชื่อสินค้า" และ "สต๊อกสินค้า" ในไฟล์นี้' };
   const groups = new Map(); let rows = 0, neg = 0, skipped = 0;
   for (const r of aoa.slice(1)) {
@@ -1011,8 +1021,8 @@ function planPosImport(aoa) {
     if (p.qty >= 1e5) { skipped++; continue; } // services carry a placeholder stock like 99999933 / 999969
     rows++; if (p.neg) neg++;
     let g = groups.get(p.pk); if (!g) groups.set(p.pk, g = { pk: p.pk, name: p.name, category: p.category, unit: p.unit, variants: new Map() });
-    const vk = `${p.color}|${p.size}`, v = g.variants.get(vk);
-    if (v) v.qty += p.qty; else g.variants.set(vk, { vk, color: p.color, hex: p.hex, size: p.size, qty: p.qty });
+    const vk = `${p.color}|${p.size}`, v = g.variants.get(vk), price = c.price >= 0 ? num(r[c.price]) : 0;
+    if (v) { v.qty += p.qty; if (price > 0) v.price = price; } else g.variants.set(vk, { vk, color: p.color, hex: p.hex, size: p.size, qty: p.qty, price: price > 0 ? price : undefined });
   }
   return { groups, rows, neg, skipped };
 }
@@ -1044,7 +1054,7 @@ function diffPos(plan) {
     const p = m.get(g.pk);
     if (!p) { d.newP++; d.newV += g.variants.size; return; }
     if (p.pk !== g.pk) d.moved++;
-    g.variants.forEach(v => { const x = p.variants.find(y => y.vk === v.vk); if (!x) d.newV++; else if (x.qty !== v.qty) d.upd++; else d.same++; });
+    g.variants.forEach(v => { const x = p.variants.find(y => y.vk === v.vk); if (!x) d.newV++; else if (x.qty !== v.qty || (v.price && x.price !== v.price)) d.upd++; else d.same++; });
   });
   db.products.forEach(p => {
     if (!p.pk) return;
@@ -1070,7 +1080,7 @@ function applyPos(plan, mode = 'keep') {
     }
     g.variants.forEach(v => {
       const x = p.variants.find(y => y.vk === v.vk);
-      if (x) { x.qty = v.qty; delete x.gone; } else p.variants.push({ id: uid(), color: v.color, hex: v.hex, size: v.size, qty: v.qty, vk: v.vk });
+      if (x) { x.qty = v.qty; if (v.price) x.price = v.price; delete x.gone; } else p.variants.push({ id: uid(), color: v.color, hex: v.hex, size: v.size, qty: v.qty, vk: v.vk, price: v.price });
     });
   });
   const emptied = [];
@@ -1096,7 +1106,7 @@ function posPreview(fileName) {
     <div class="group" style="padding:6px 14px">
       <div class="row" style="border:0"><span style="flex:1">เพิ่มสินค้าใหม่</span><b class="num">${d.newP}</b></div>
       <div class="row"><span style="flex:1">เพิ่มสี/ไซส์ใหม่ (ในสินค้าเดิมและใหม่)</span><b class="num">${d.newV}</b></div>
-      <div class="row"><span style="flex:1">อัปเดตจำนวนสต็อก</span><b class="num">${d.upd}</b></div>
+      <div class="row"><span style="flex:1">อัปเดตจำนวนสต็อก/ราคา</span><b class="num">${d.upd}</b></div>
       <div class="row"><span style="flex:1">ไม่เปลี่ยนแปลง</span><b class="num">${d.same}</b></div>${d.moved ? `<div class="row"><span style="flex:1">ย้ายหมวดตาม POS (ประวัติและรูปคงเดิม)</span><b class="num">${d.moved}</b></div>` : ''}</div>
     <p class="hint">${P.neg ? `สต็อกติดลบ ${P.neg} แถว จะถูกปัดเป็น 0<br>` : ''}${P.skipped ? `ข้ามรายการบริการที่ตั้งสต็อกเป็นค่าสมมติ ${P.skipped} แถว<br>` : ''}
     การนำเข้าจะเขียนทับ <b>จำนวนสต็อก</b> ของรายการที่ตรงกัน ส่วนรูปและสินค้าที่คุณเพิ่มเองในแอปจะไม่ถูกแตะ<br>ระบบจะเก็บภาพสต็อกครั้งนี้ไว้ เพื่อคำนวณยอดขาย ขายดี/ขายไม่ดี เทียบกับครั้งก่อน (ครั้งที่ ${db.snaps.length + 1})</p>

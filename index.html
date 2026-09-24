@@ -1012,7 +1012,8 @@ function planPosImport(aoa) {
   const head = (aoa[0] || []).map(h => String(h ?? '').trim());
   const col = names => head.findIndex(h => names.some(n => h.includes(n)));
   const c = { name: col(['ชื่อสินค้า']), cat: col(['หมวดหมู่']), unit: col(['หน่วย']), stock: col(['สต๊อก', 'สต็อก']), price: col(['ราคาขาย']) };
-  if (c.price < 0 && head.length > 4) c.price = 4; // selling price is column E in the GPOS export
+  // GPOS puts the selling price in column E. Without a "ราคาขาย" header, trust column E only if its header says "ราคา" (not cost/stock) and no other field uses it.
+  if (c.price < 0 && /ราคา/.test(head[4] || '') && !/ต้นทุน|มูลค่า/.test(head[4]) && ![c.name, c.cat, c.unit, c.stock].includes(4)) c.price = 4;
   if (c.name < 0 || c.stock < 0) return { error: 'ไม่พบคอลัมน์ "ชื่อสินค้า" และ "สต๊อกสินค้า" ในไฟล์นี้' };
   const groups = new Map(); let rows = 0, neg = 0, skipped = 0;
   for (const r of aoa.slice(1)) {
@@ -1024,7 +1025,7 @@ function planPosImport(aoa) {
     const vk = `${p.color}|${p.size}`, v = g.variants.get(vk), price = c.price >= 0 ? num(r[c.price]) : 0;
     if (v) { v.qty += p.qty; if (price > 0) v.price = price; } else g.variants.set(vk, { vk, color: p.color, hex: p.hex, size: p.size, qty: p.qty, price: price > 0 ? price : undefined });
   }
-  return { groups, rows, neg, skipped };
+  return { groups, rows, neg, skipped, hasPrice: c.price >= 0 };
 }
 
 function loadXLSX() {
@@ -1054,7 +1055,7 @@ function diffPos(plan) {
     const p = m.get(g.pk);
     if (!p) { d.newP++; d.newV += g.variants.size; return; }
     if (p.pk !== g.pk) d.moved++;
-    g.variants.forEach(v => { const x = p.variants.find(y => y.vk === v.vk); if (!x) d.newV++; else if (x.qty !== v.qty || (v.price && x.price !== v.price)) d.upd++; else d.same++; });
+    g.variants.forEach(v => { const x = p.variants.find(y => y.vk === v.vk); if (!x) d.newV++; else if (x.qty !== v.qty || (plan.hasPrice && (x.price || 0) !== (v.price || 0))) d.upd++; else d.same++; });
   });
   db.products.forEach(p => {
     if (!p.pk) return;
@@ -1080,7 +1081,7 @@ function applyPos(plan, mode = 'keep') {
     }
     g.variants.forEach(v => {
       const x = p.variants.find(y => y.vk === v.vk);
-      if (x) { x.qty = v.qty; if (v.price) x.price = v.price; delete x.gone; } else p.variants.push({ id: uid(), color: v.color, hex: v.hex, size: v.size, qty: v.qty, vk: v.vk, price: v.price });
+      if (x) { x.qty = v.qty; if (plan.hasPrice) { if (v.price) x.price = v.price; else delete x.price; } delete x.gone; } else p.variants.push({ id: uid(), color: v.color, hex: v.hex, size: v.size, qty: v.qty, vk: v.vk, price: v.price });
     });
   });
   const emptied = [];

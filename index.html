@@ -45,7 +45,7 @@ svg{width:1em;height:1em;flex:none;stroke:currentColor;fill:none;stroke-width:2;
 .hero h1{font-family:var(--head);font-size:24px;font-weight:600;margin:0;letter-spacing:-.2px}
 .hero .sub{font-size:13px;opacity:.75;margin-top:2px}
 .circle-btn{width:42px;height:42px;border-radius:14px;background:rgba(255,255,255,.16);color:#fff;font-size:20px;display:grid;place-items:center;backdrop-filter:blur(6px)}
-.stats{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;margin-top:20px;position:relative;z-index:1}
+.stats{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:20px;position:relative;z-index:1}
 .stat{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:11px 12px;backdrop-filter:blur(6px)}
 .stat b{display:block;font-family:var(--head);font-size:24px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
 .stat span{font-size:12px;opacity:.8}
@@ -66,8 +66,8 @@ svg{width:1em;height:1em;flex:none;stroke:currentColor;fill:none;stroke-width:2;
 .sw{display:inline-block;width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(128,128,128,.4);flex:none}
 
 /* cards */
-.list{display:grid;gap:12px;padding:8px 16px 0}
-.card{display:block;width:100%;text-align:left;background:var(--surface);border-radius:20px;padding:14px;box-shadow:var(--shadow);animation:pop .25s ease-out both}
+.list{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:8px 16px 0}
+.card{display:block;width:100%;min-width:0;text-align:left;background:var(--surface);border-radius:20px;padding:14px;box-shadow:var(--shadow);animation:pop .25s ease-out both}
 @keyframes pop{from{opacity:0;transform:translateY(8px)}}
 .card-top{display:flex;gap:12px;align-items:center}
 .mosaic{width:52px;height:52px;border-radius:15px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;flex:none;background:var(--chip);box-shadow:inset 0 0 0 1px rgba(128,128,128,.25);color:var(--muted);place-items:center;font-size:22px}
@@ -121,7 +121,7 @@ svg{width:1em;height:1em;flex:none;stroke:currentColor;fill:none;stroke-width:2;
 .icon-btn{width:40px;height:40px;border-radius:13px;background:var(--surface);box-shadow:var(--shadow);font-size:18px;display:grid;place-items:center;flex:none}
 .icon-btn.tint{background:var(--chip);color:var(--brand)}
 .panel-body{overflow-y:auto;padding:4px 16px calc(24px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
-.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.mini-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
 .mini-stats div{background:var(--surface);border-radius:14px;padding:9px 12px;box-shadow:var(--shadow)}
 .mini-stats b{display:block;font-family:var(--head);font-size:20px;font-weight:600;line-height:1.15}
 .mini-stats span{font-size:12px;color:var(--muted)}
@@ -182,6 +182,8 @@ a.icon-btn{color:var(--brand);text-decoration:none}
 .spark{width:100%;height:64px;stroke:none;fill:none;display:block}
 .sec{font-family:var(--head);font-weight:600;font-size:15px;margin:16px 2px 8px}
 .numc{min-width:34px;text-align:right;font-family:var(--head);font-weight:600}
+.pkr{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px}
+.pkr input{width:20px;height:20px;accent-color:var(--brand);flex:none}
 .banner-i{background:color-mix(in srgb,var(--brand) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--brand) 28%,transparent);border-radius:16px;padding:14px;font-size:14px;margin-bottom:4px}
 .banner-i .btn{margin-top:10px;min-height:42px;padding:8px 16px;font-size:14px}
 .nb{position:absolute;top:3px;left:calc(50% + 6px);background:var(--danger);color:#fff;border-radius:99px;font-size:11px;font-weight:600;min-width:18px;height:18px;line-height:18px;padding:0 5px;text-align:center}
@@ -301,12 +303,14 @@ a.icon-btn{color:var(--brand);text-decoration:none}
 <div class="layer" id="l1" hidden></div>
 <div class="layer" id="l2" hidden></div>
 <div class="layer" id="l3" hidden></div>
-<input type="file" id="importFile" accept="application/json,.json" hidden>
+<input type="file" id="importFile" accept="application/json,.json,.txt" multiple hidden>
 <input type="file" id="posFile" accept=".xlsx,.xls,.csv" hidden>
+<input type="file" id="mergeFile" accept="application/json,.json,.txt" hidden>
 
 <script>
 'use strict';
-const KEY = 'stock-app-v1';
+const KEY = 'stock-app-v1', PREV_KEY = KEY + '-prev', BAD_KEY = KEY + '-corrupt';
+let loadNotice = '';
 const PRESET_COLORS = [['ดำ','#1f1f1f'],['ขาว','#f5f5f5'],['เทา','#9e9e9e'],['แดง','#e53935'],['ชมพู','#f48fb1'],['ส้ม','#fb8c00'],['เหลือง','#fdd835'],['เขียว','#43a047'],['ฟ้า','#29b6f6'],['น้ำเงิน','#1e40af'],['ม่วง','#8e24aa'],['น้ำตาล','#795548'],['ครีม','#f3e5c8']];
 const PRESET_SIZES = ['2XS','XS','S','M','L','XL','2XL','3XL','4XL','5XL','Free'];
 
@@ -320,7 +324,7 @@ const icon = n => `<svg><use href="#i-${n}"/></svg>`;
 const buzz = () => { try { navigator.vibrate && navigator.vibrate(8); } catch {} };
 
 let db = load();
-const ui = { tab: 'stock', cat: null, q: '', cq: '', color: null, size: null, open: null, cust: null, sview: 'list', sper: 'last', sfilter: 'all', sdet: null, cview: 'cust', qview: 'wait', qsort: 'due', per: 'all', by: 'drop', from: '', to: '', shown: [] };
+const ui = { tab: 'stock', src: db.products.some(p => p.pk) ? 'pos' : 'own', cat: null, gone: false, q: '', cq: '', color: null, size: null, open: null, cust: null, sview: 'list', sper: 'last', sfilter: 'all', sdet: null, cview: 'cust', qview: 'wait', qsort: 'due', per: 'all', by: 'drop', from: '', to: '', shown: [] };
 
 /* ---------- product photos (IndexedDB, keyed by product id) ---------- */
 const imgs = new Map(); // product id -> object URL
@@ -361,19 +365,78 @@ const toDataURL = blob => new Promise((res, rej) => { const r = new FileReader()
 const avatar = (p, hexes, big) => imgs.has(p.id)
   ? `<div class="mosaic ${big ? 'lg' : ''}"><img src="${imgs.get(p.id)}" alt=""></div>` : mosaic(hexes, big);
 
+// Thai numbers: +66 81 234 5678 / 0066812345678 / 081-234-5678 all become 0812345678
+function normPhone(s) {
+  let d = String(s ?? '').replace(/\D/g, ''), intl = false;
+  if (d.startsWith('0066')) { d = d.slice(4); intl = true; }
+  else if (d.startsWith('66') && d.length >= 10) { d = d.slice(2); intl = true; }
+  if (intl && !d.startsWith('0')) d = '0' + d;
+  return d;
+}
+// Makes any loaded / restored data structurally safe so one bad record can never break the whole app
+function normalizeDb(d) {
+  d = d && typeof d === 'object' ? d : {};
+  const seen = new Set(), idOk = x => typeof x === 'string' && /^[\w-]{1,40}$/.test(x);
+  const uniqId = x => { const id = idOk(x) && !seen.has(x) ? x : uid(); seen.add(id); return id; };
+  const str = v => String(v ?? ''), n0 = v => { const n = Number(v); return isFinite(n) ? n : 0; };
+  const isDay = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const products = (Array.isArray(d.products) ? d.products : []).filter(p => p && typeof p === 'object').map(p => ({
+    ...p, id: uniqId(p.id), name: str(p.name), sku: str(p.sku), category: str(p.category), unit: str(p.unit), pk: p.pk ? str(p.pk) : undefined,
+    variants: (Array.isArray(p.variants) ? p.variants : []).filter(v => v && typeof v === 'object').map(v => ({
+      ...v, id: uniqId(v.id), color: str(v.color) || 'ไม่ระบุ', size: str(v.size) || 'Free', qty: Math.max(0, Math.floor(n0(v.qty))),
+      hex: /^#[0-9a-f]{3,8}$/i.test(v.hex) ? v.hex : '#c7cad6', vk: v.vk ? str(v.vk) : undefined, gone: v.gone ? true : undefined }))
+  }));
+  const orders = (Array.isArray(d.orders) ? d.orders : []).filter(o => o && typeof o === 'object').map(o => ({
+    ...o, id: uniqId(o.id), phone: normPhone(o.phone), name: str(o.name), racket: str(o.racket), string: str(o.string), t: str(o.t), t2: str(o.t2), note: str(o.note),
+    unit: o.unit === 'kg' ? 'kg' : 'lbs', date: isDay(o.date) ? o.date : new Date().toISOString().slice(0, 10), pickup: isDay(o.pickup) ? o.pickup : '',
+    status: o.status === 'wait' || o.status === 'done' ? o.status : '', doneAt: str(o.doneAt), urgent: !!o.urgent, free: Math.max(0, n0(o.free)),
+    skip: o.skip === 'skip' ? 'skip' : str(o.skip), knot: str(o.knot), pre: str(o.pre), u: str(o.u) }));
+  const adj = {}; Object.entries(d.adj && typeof d.adj === 'object' ? d.adj : {}).forEach(([k, v]) => { const ph = normPhone(k); adj[ph] = (adj[ph] || 0) + n0(v); });
+  const isoMap = m => { const out = {}; if (m && typeof m === 'object') Object.entries(m).forEach(([k, v]) => { if (typeof v === 'string') out[k] = v; }); return out; };
+  const tomb = isoMap(d.tomb), adjAt = {};
+  Object.entries(isoMap(d.adjAt)).forEach(([k, v]) => { const ph = normPhone(k); if (!adjAt[ph] || v > adjAt[ph]) adjAt[ph] = v; });
+  const st = d.settings && typeof d.settings === 'object' ? d.settings : {};
+  const settings = { ...st, goal: Math.min(50, Math.max(1, parseInt(st.goal) || 10)) };
+  const snaps = (Array.isArray(d.snaps) ? d.snaps : []).filter(x => x && typeof x.t === 'string' && x.q && typeof x.q === 'object');
+  return { db: { products, orders, settings, adj, snaps, tomb, adjAt } };
+}
 function load() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.products)) { d.orders = Array.isArray(d.orders) ? d.orders : []; d.settings = d.settings || { goal: 10 }; d.adj = d.adj || {}; d.snaps = Array.isArray(d.snaps) ? d.snaps : []; return d; } } catch {}
-  return { products: [], orders: [], settings: { goal: 10 }, adj: {}, snaps: [] };
+  let raw = null; try { raw = localStorage.getItem(KEY); } catch {}
+  if (!raw) return normalizeDb({}).db;
+  try { const d = JSON.parse(raw); if (d && Array.isArray(d.products)) return normalizeDb(d).db; throw 0; }
+  catch { try { localStorage.setItem(BAD_KEY, raw); } catch {} loadNotice = 'bad'; return normalizeDb({}).db; } // keep the unreadable text, never overwrite it
 }
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { toast('บันทึกไม่สำเร็จ พื้นที่เก็บข้อมูลเต็มหรือถูกปิดไว้'); }
+  try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
+  catch { toast('บันทึกลงเครื่องไม่สำเร็จ พื้นที่เต็มหรือถูกปิดไว้ ข้อมูลล่าสุดยังไม่ถูกเก็บ กรุณาสำรองข้อมูลทันที', 7000); return false; }
+}
+// one automatic safety copy of the data (without photos) before anything destructive
+function keepPrev(why) { try { localStorage.setItem(PREV_KEY, JSON.stringify({ t: new Date().toISOString(), why, data: db })); } catch {} }
+function prevInfo() { try { const p = JSON.parse(localStorage.getItem(PREV_KEY)); return p && p.data ? p : null; } catch { return null; } }
+// iOS home-screen apps often ignore <a download>; the share sheet ("Save to Files") is the reliable route there
+async function saveFile(name, blob) {
+  const file = new File([blob], name, { type: blob.type });
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return true; } catch (err) { if (err && err.name === 'AbortError') return false; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000); return true;
 }
 const product = id => db.products.find(p => p.id === id);
 const total = vs => vs.reduce((n, v) => n + v.qty, 0);
-function toast(msg) {
+function toast(msg, ms = 2200) {
+  document.querySelectorAll('.toast').forEach(x => x.remove());
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-  document.body.append(t); setTimeout(() => t.remove(), 2200);
+  document.body.append(t); setTimeout(() => t.remove(), ms);
 }
+let lastErr = 0;
+function reportError(e) {
+  console.error(e);
+  if (Date.now() - lastErr > 3000) { lastErr = Date.now(); toast('เกิดข้อผิดพลาด: ' + String((e && e.message) || e).slice(0, 80) + ' (ข้อมูลเดิมยังอยู่)', 5000); }
+}
+window.addEventListener('error', ev => reportError(ev.error || ev.message));
+window.addEventListener('unhandledrejection', ev => reportError(ev.reason));
 function byColor(vs) {
   const m = new Map();
   vs.forEach(v => { const g = m.get(v.color) || { hex: v.hex, n: 0, vs: [] }; g.n += v.qty; g.vs.push(v); m.set(v.color, g); });
@@ -414,7 +477,7 @@ function takeSnapshot(fileName) {
   db.products.forEach(p => { if (p.pk) p.variants.forEach(v => { if (v.vk && v.qty > 0) q[v.id] = v.qty; }); });
   db.snaps.push({ t: new Date().toISOString(), f: fileName || '', q });
   if (db.snaps.length > SNAP_MAX) db.snaps.splice(0, db.snaps.length - SNAP_MAX);
-  save();
+  return save();
 }
 // sold = stock that went down between two snapshots (stock that went up is a restock and is ignored)
 function analyseSales() {
@@ -427,7 +490,7 @@ function analyseSales() {
   const items = [];
   db.products.forEach(p => {
     if (!p.pk) return;
-    const vs = p.variants.filter(x => x.vk).map(x => {
+    const vs = p.variants.filter(x => x.vk && !x.gone).map(x => {
       const series = win.map(sn => sn.q[x.id] || 0); let sold = 0, restock = 0;
       for (let i = 1; i < series.length; i++) { const d = series[i - 1] - series[i]; if (d > 0) sold += d; else restock -= d; }
       const rate = sold / days;
@@ -440,15 +503,17 @@ function analyseSales() {
   const pos = items.filter(i => i.sold > 0).sort((a, b) => b.sold - a.sold);
   const cut = pos.length ? pos[Math.max(0, Math.ceil(pos.length * 0.2) - 1)].sold : 0;
   items.forEach(i => {
+    i.unk = i.sold === 0 && i.restock > 0; // stock only went up: sales cannot be told apart from a restock
     i.best = i.sold > 0 && i.sold >= Math.max(cut, 2);
     i.low = i.sold > 0 && i.stock > 0 && i.cover < 14;
     i.out = i.sold > 0 && i.stock === 0;
-    i.slow = i.stock > 0 && !i.best && (i.sold === 0 || i.cover > 120); // a best seller is never also "slow"
+    i.slow = i.stock > 0 && !i.best && !i.unk && (i.sold === 0 || i.cover > 120); // a best seller is never also "slow"
   });
   return { win, days, items };
 }
 function salesBadges(i) {
   return (i.best ? '<span class="badge ok">ขายดี</span>' : '') + (i.out ? '<span class="badge warn">ขายหมดแล้ว</span>' : i.low ? '<span class="badge warn">ควรสั่งเพิ่ม</span>' : '') +
+    (i.unk ? '<span class="badge mut">เติมของ · ประเมินยอดขายไม่ได้</span>' : '') +
     (i.slow ? `<span class="badge">${i.sold === 0 ? 'ไม่มีการขาย' : 'ขายช้า'}</span>` : '');
 }
 function renderSales(seg, cats, scope) {
@@ -482,14 +547,14 @@ function renderSales(seg, cats, scope) {
     : items.slice().sort((a, b) => b.sold - a.sold || b.stock - a.stock));
   const max = Math.max(1, ...items.map(i => i.sold));
   const info = `<div class="hint" style="margin:2px 2px 4px">คำนวณจากการนำเข้า ${esc(dShort(A.win[0].t))} → ${esc(dShort(A.win[A.win.length - 1].t))} (${Math.round(A.days)} วัน · ${A.win.length} ครั้ง)${A.days < 3 ? ' <b style="color:var(--warn)">ช่วงสั้นมาก ตัวเลขอาจยังไม่แม่นยำ</b>' : ''}</div>`;
-  const legend = `<div class="hint" style="margin-top:8px"><b>เกณฑ์</b><br>ขายดี = อยู่ใน 20% แรกของยอดขาย และขายอย่างน้อย 2 ชิ้น<br>ควรสั่งเพิ่ม = ขายได้ แต่ของเหลือพอขายไม่ถึง 14 วัน หรือขายหมดแล้ว<br>ขายไม่ดี = ไม่มีการขายเลยในช่วงนี้ หรือของเหลือพอขายเกิน 120 วัน (สินค้าขายดีจะไม่ถูกจัดเป็นขายไม่ดี)<br>ยอดขายคำนวณจากจำนวนสต็อกที่ลดลงระหว่างการนำเข้า ถ้ามีการเติมของระหว่างช่วง ยอดอาจต่ำกว่าจริง สินค้าที่เพิ่มเองในแอปไม่ถูกนำมาคำนวณ</div>`;
+  const legend = `<div class="hint" style="margin-top:8px"><b>เกณฑ์</b><br>ขายดี = อยู่ใน 20% แรกของยอดขาย และขายอย่างน้อย 2 ชิ้น<br>ควรสั่งเพิ่ม = ขายได้ แต่ของเหลือพอขายไม่ถึง 14 วัน หรือขายหมดแล้ว<br>ขายไม่ดี = ไม่มีการขายเลยในช่วงนี้ หรือของเหลือพอขายเกิน 120 วัน (สินค้าขายดีจะไม่ถูกจัดเป็นขายไม่ดี)<br>ยอดขายคำนวณจากจำนวนสต็อกที่ลดลงระหว่างการนำเข้า ถ้ามีการเติมของระหว่างช่วง ยอดอาจต่ำกว่าจริง สินค้าที่เติมของแต่สต็อกไม่ลดลงจะแสดงเป็น "ประเมินยอดขายไม่ได้" ไม่ถูกนับเป็นขายไม่ดี สินค้าที่เพิ่มเองในแอปไม่ถูกนำมาคำนวณ</div>`;
   if (!list.length) { $('#list').innerHTML = info + `<div class="empty"><svg class="big"><use href="#i-search"/></svg><h3>ไม่มีรายการในกลุ่มนี้</h3>ลองเปลี่ยนช่วงเวลาหรือหมวดหมู่</div>` + legend; return; }
   $('#list').innerHTML = info + list.map((i, n) => `<button class="card" data-act="sales" data-id="${i.p.id}" style="animation:none">
       <div class="card-top">${avatar(i.p, [...new Set(i.vs.map(r => r.v.hex))])}
         <div class="info"><div class="name">${esc(i.p.name)}</div><div class="meta">#${n + 1}${i.p.category ? ' · ' + esc(i.p.category) : ''}</div></div>
         <div class="qty"><b>${i.sold.toLocaleString()}</b><small>${esc(i.p.unit || 'ชิ้น')}ที่ขาย</small></div></div>
       <div class="bar" style="margin:12px 0 10px"><i style="flex:${i.sold};background:var(--brand)"></i><i style="flex:${max - i.sold};background:transparent;min-width:0;box-shadow:none"></i></div>
-      <div class="pills">${salesBadges(i)}<span class="pill">เหลือ <b class="num">${i.stock}</b></span>${i.sold > 0 ? `<span class="pill">เฉลี่ย <b class="num">${i.rate.toFixed(1)}</b>/วัน</span>${i.stock > 0 ? `<span class="pill">พอขาย ~<b class="num">${Math.round(i.cover)}</b> วัน</span>` : ''}` : ''}</div></button>`).join('') + legend;
+      <div class="pills">${salesBadges(i)}<span class="pill">เหลือ <b class="num">${i.stock}</b></span>${i.restock > 0 ? `<span class="pill">เติม +${i.restock}</span>` : ''}${i.sold > 0 ? `<span class="pill">เฉลี่ย <b class="num">${i.rate.toFixed(1)}</b>/วัน</span>${i.stock > 0 ? `<span class="pill">พอขาย ~<b class="num">${Math.round(i.cover)}</b> วัน</span>` : ''}` : ''}</div></button>`).join('') + legend;
 }
 function spark(series) {
   const W = 300, H = 64, max = Math.max(1, ...series), n = series.length;
@@ -530,12 +595,19 @@ const SALES_PERIODS = [['last', 'ล่าสุด'], ['30', '30 วัน'], [
 
 function renderStock() {
   $('#title').textContent = 'สต็อกสินค้า';
-  const seg = `<div class="seg"><button class="${ui.sview === 'list' ? 'on' : ''}" data-act="sview" data-v="list">รายการสินค้า</button><button class="${ui.sview === 'sales' ? 'on' : ''}" data-act="sview" data-v="sales">ขายดี / ขายไม่ดี</button></div>`;
-  const catN = new Map(); db.products.forEach(p => { if (p.category) catN.set(p.category, (catN.get(p.category) || 0) + 1); });
+  const viewSeg = `<div class="seg"><button class="${ui.sview === 'list' ? 'on' : ''}" data-act="sview" data-v="list">รายการสินค้า</button><button class="${ui.sview === 'sales' ? 'on' : ''}" data-act="sview" data-v="sales">ขายดี / ขายไม่ดี</button></div>`;
+  const nPos = db.products.filter(p => p.pk).length, nOwn = db.products.length - nPos;
+  const srcProducts = db.products.filter(p => ui.src === 'pos' ? p.pk : !p.pk);
+  const goneN = ui.src === 'pos' ? srcProducts.filter(p => p.variants.some(v => v.gone)).length : 0;
+  if (!goneN) ui.gone = false;
+  const seg = `<div class="seg"><button class="${ui.src === 'pos' ? 'on' : ''}" data-act="src" data-v="pos">สต็อกจาก POS (${nPos})</button><button class="${ui.src === 'own' ? 'on' : ''}" data-act="src" data-v="own">สต็อกเพิ่มเอง (${nOwn})</button></div>` + (ui.src === 'pos' ? viewSeg : '');
+  const salesView = ui.src === 'pos' && ui.sview === 'sales';
+  const catN = new Map(); srcProducts.forEach(p => { if (p.category) catN.set(p.category, (catN.get(p.category) || 0) + 1); });
   const cats = [...catN.keys()].sort((a, b) => catN.get(b) - catN.get(a));
   if (ui.cat && !cats.includes(ui.cat)) ui.cat = null;
-  const scope = ui.cat ? db.products.filter(p => p.category === ui.cat) : db.products;
-  if (ui.sview === 'sales') return renderSales(seg, cats, scope);
+  let scope = ui.cat ? srcProducts.filter(p => p.category === ui.cat) : srcProducts;
+  if (ui.gone && !salesView) scope = scope.filter(p => p.variants.some(v => v.gone));
+  if (salesView) return renderSales(seg, cats, scope);
   if (ui.color && !usedColors(scope).some(([c]) => c === ui.color)) ui.color = null;
   if (ui.size && !usedSizes(scope).includes(ui.size)) ui.size = null;
 
@@ -545,27 +617,31 @@ function renderStock() {
     .filter(({ p, vs }) => (!(ui.color || ui.size) || vs.length) && (!q || (p.name + ' ' + p.sku + ' ' + (p.category || '')).toLowerCase().includes(q)));
 
   const outCount = rows.reduce((n, r) => n + r.vs.filter(v => v.qty === 0).length, 0);
-  $('#sub').textContent = ui.cat || ui.color || ui.size ? 'กำลังกรอง: ' + [ui.cat, ui.color, ui.size].filter(Boolean).join(' · ') : 'ภาพรวมสินค้าคงคลัง';
+  $('#sub').textContent = ui.cat || ui.color || ui.size ? 'กำลังกรอง: ' + [ui.cat, ui.color, ui.size].filter(Boolean).join(' · ') : (ui.src === 'pos' ? 'สต็อกจาก POS · อัปเดตจากไฟล์' : 'สต็อกที่เพิ่มเอง · ไม่เกี่ยวกับ POS');
   $('#summary').innerHTML =
     `<div class="stat"><b>${rows.reduce((n, r) => n + total(r.vs), 0).toLocaleString()}</b><span>ชิ้นทั้งหมด</span></div>` +
     `<div class="stat"><b>${rows.length.toLocaleString()}</b><span>รายการ</span></div>` +
     `<div class="stat ${outCount ? 'alert' : ''}"><b>${outCount}</b><span>ไซส์ที่หมด</span></div>`;
 
-  const colors = usedColors(scope), sizes = usedSizes(scope), filtering = ui.cat || ui.color || ui.size;
+  const colors = usedColors(scope), sizes = usedSizes(scope), filtering = ui.cat || ui.color || ui.size || ui.gone;
+  const goneRow = goneN ? `<div class="frow"><span class="lbl">สถานะ</span><button class="chip ${ui.gone ? 'on' : ''}" data-act="fgone">ไม่พบในไฟล์ POS ล่าสุด (${goneN})</button></div>` : '';
   $('#filters').innerHTML =
-    seg + catRow(cats) +
+    seg + catRow(cats) + goneRow +
     (colors.length ? `<div class="frow"><span class="lbl">สี</span>${colors.map(([c, h]) =>
       `<button class="chip ${ui.color === c ? 'on' : ''}" data-act="fcolor" data-v="${esc(c)}">${swatch(h)}${esc(c)}</button>`).join('')}</div>` : '') +
     (sizes.length ? `<div class="frow"><span class="lbl">ไซส์</span>${sizes.map(s =>
-      `<button class="chip ${ui.size === s ? 'on' : ''}" data-act="fsize" data-v="${esc(s)}">${esc(s)}</button>`).join('')}${filtering ? '<button class="chip clear" data-act="fclear">ล้างตัวกรอง</button>' : ''}</div>` : '');
+      `<button class="chip ${ui.size === s ? 'on' : ''}" data-act="fsize" data-v="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : '') + (filtering ? '<div class="frow"><button class="chip clear" data-act="fclear">ล้างตัวกรอง</button></div>' : '');
 
-  if (!db.products.length) {
-    $('#list').innerHTML = `<div class="empty"><svg class="big"><use href="#i-box"/></svg><h3>ยังไม่มีสินค้า</h3>กดปุ่ม "เพิ่มสินค้า" เพื่อเริ่มต้น<br><button class="btn ghost" data-act="demo">ลองใช้ข้อมูลตัวอย่าง</button></div>`;
+  if (!srcProducts.length) {
+    $('#list').innerHTML = ui.src === 'pos'
+      ? `<div class="empty"><svg class="big"><use href="#i-box"/></svg><h3>ยังไม่มีสต็อกจาก POS</h3>นำเข้าไฟล์สต็อกที่ส่งออกจาก GPOS ระบบจะสร้างรายการให้ และอัปเดตทุกครั้งที่นำเข้าไฟล์ใหม่<br><button class="btn primary" data-act="posimport">${icon('up')}นำเข้าสต็อกจาก POS</button></div>`
+      : `<div class="empty"><svg class="big"><use href="#i-box"/></svg><h3>ยังไม่มีสต็อกที่เพิ่มเอง</h3>รายการที่นี่แยกจาก POS โดยสิ้นเชิง การนำเข้าไฟล์ POS จะไม่แตะต้อง กดปุ่ม "เพิ่มสินค้า" เพื่อเริ่มต้น<br><button class="btn ghost" data-act="demo">ลองใช้ข้อมูลตัวอย่าง</button></div>`;
     return;
   }
   if (!rows.length) { $('#list').innerHTML = `<div class="empty"><svg class="big"><use href="#i-search"/></svg><h3>ไม่พบสินค้า</h3>ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</div>`; return; }
 
-  $('#list').innerHTML = rows.map(({ p, vs }, i) => {
+  const goneBanner = ui.gone ? `<div class="banner-i"><b>${goneN} สินค้ามีรายการที่ไม่พบในไฟล์ POS ล่าสุด</b><br>อาจถูกลบหรือเปลี่ยนชื่อใน POS จำนวนที่เห็นเป็นค่าเก่า จัดการทั้งหมดได้ที่นี่ (ระบบเก็บสำเนาไว้ให้ย้อนกลับ)<br><button class="btn ghost" data-act="gonezero">ตั้งจำนวนเป็น 0</button> <button class="btn danger" data-act="gonedel">ลบรายการเหล่านี้</button></div>` : '';
+  $('#list').innerHTML = goneBanner + rows.map(({ p, vs }, i) => {
     const groups = byColor(vs), sum = total(vs), out = vs.filter(v => v.qty === 0).length;
     const badge = !vs.length ? '' : sum === 0 ? '<span class="badge">หมดสต็อก</span>' : out ? `<span class="badge warn">หมด ${out} ไซส์</span>` : '';
     const sizeSet = [...new Set(vs.map(v => v.size))].sort((a, b) => sizeRank(a) - sizeRank(b));
@@ -575,7 +651,7 @@ function renderStock() {
           <div class="meta">${esc([p.category, p.sku].filter(Boolean).join(' · ')) || 'ไม่มีรหัส'}${vs.length ? ` · ${groups.size} สี · ${sizeSet.length} ไซส์` : ''}</div></div>
         <div class="qty"><b>${sum.toLocaleString()}</b><small>${esc(p.unit || 'ชิ้น')}</small></div></div>
       ${vs.length ? `<div class="bar">${[...groups.values()].filter(g => g.n > 0).map(g => `<i style="flex:${g.n};background:${esc(g.hex)}"></i>`).join('')}</div>
-      <div class="pills">${[...groups].map(([c, g]) => `<span class="pill">${swatch(g.hex)}${esc(c)} <b class="num">${g.n}</b></span>`).join('')}${badge}</div>`
+      <div class="pills">${[...groups].map(([c, g]) => `<span class="pill">${swatch(g.hex)}${esc(c)} <b class="num">${g.n}</b></span>`).join('')}${badge}${vs.some(v => v.gone) ? '<span class="badge mut">ไม่พบใน POS ล่าสุด</span>' : ''}</div>`
       : '<div class="meta" style="margin-top:10px">ยังไม่มีสี/ไซส์ แตะเพื่อเพิ่ม</div>'}
     </button>`;
   }).join('');
@@ -641,7 +717,7 @@ function productForm(p) {
     <label>ชื่อสินค้า</label><input id="pf-name" class="field" value="${esc(p?.name)}" placeholder="เช่น เสื้อยืดคอกลม" autocomplete="off">
     <label>รหัสสินค้า (ไม่บังคับ)</label><input id="pf-sku" class="field" value="${esc(p?.sku)}" placeholder="เช่น TS-001" autocomplete="off">
     <label>หมวดหมู่ (ไม่บังคับ)</label><input id="pf-cat" class="field" list="dl-cat" value="${esc(p?.category)}" placeholder="เช่น รองเท้า, เอ็น, ไม้แบด" autocomplete="off">
-    <datalist id="dl-cat">${[...new Set(db.products.map(x => x.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <datalist id="dl-cat">${[...new Set(db.products.filter(x => !!x.pk === !!p?.pk).map(x => x.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <div class="actions"><button class="btn primary block" data-act="savep" data-id="${p?.id || ''}">${p ? 'บันทึก' : 'ถัดไป: เพิ่มสี/ไซส์'}</button>
     ${p ? `<button class="btn danger block" data-act="delp" data-id="${p.id}">${icon('trash')}ลบสินค้านี้</button>` : ''}</div></div>`);
   refreshPhotoPreview();
@@ -651,8 +727,8 @@ function productForm(p) {
 /* ---------- variant form ---------- */
 let vf = null;
 function variantForm(color) {
-  const known = new Map(PRESET_COLORS); usedColors().forEach(([c, h]) => known.set(c, h));
-  const sizes = new Set(PRESET_SIZES); usedSizes().forEach(s => sizes.add(s));
+  const known = new Map(PRESET_COLORS); const mine = db.products.filter(x => !!x.pk === !!product(ui.open)?.pk); usedColors(mine).forEach(([c, h]) => known.set(c, h));
+  const sizes = new Set(PRESET_SIZES); usedSizes(mine).forEach(s => sizes.add(s));
   vf = { colors: known, sizes, pickColor: color && known.has(color) ? color : null, pickSizes: new Set(), qty: 0 };
   renderVariantForm();
 }
@@ -672,15 +748,30 @@ function renderVariantForm() {
 
 /* ---------- menu / backup ---------- */
 function menu() {
+  const prev = prevInfo(), lb = db.settings.lastBackup;
+  let bad = false; try { bad = !!localStorage.getItem(BAD_KEY); } catch {}
   showLayer(2, '<h2>เมนู</h2>', `<div class="actions" style="margin-top:4px">
+    <button class="btn primary block" data-act="exportorders">${icon('down')}ส่งข้อมูลลูกค้าและคิวไปอีกเครื่อง</button>
+    <button class="btn ghost block" data-act="mergepick">${icon('up')}รับข้อมูลลูกค้าและคิวจากอีกเครื่อง (รวมกัน)</button>
     <button class="btn ghost block" data-act="csva">${icon('down')}ส่งออกออเดอร์ทั้งหมด (CSV)</button>
     <button class="btn ghost block" data-act="csvc">${icon('down')}ส่งออกรายชื่อลูกค้า (CSV)</button>
     <button class="btn ghost block" data-act="goalform">${icon('star')}ตั้งค่าแต้มสะสม (ปัจจุบัน ${goal()} ครั้ง = ฟรี 1 ครั้ง)</button>
     <button class="btn ghost block" data-act="posimport">${icon('up')}นำเข้าสต็อกจาก POS (Excel / CSV)</button>
-    <button class="btn ghost block" data-act="export">${icon('down')}สำรองข้อมูล (ดาวน์โหลดไฟล์)</button>
-    <button class="btn ghost block" data-act="import">${icon('up')}กู้คืนข้อมูลจากไฟล์</button>
+    <button class="btn ghost block" data-act="export">${icon('down')}สำรองข้อมูล (ไม่รวมรูป)</button>
+    <button class="btn ghost block" data-act="exportph">${icon('down')}สำรองรูปสินค้า (แยกไฟล์)</button>
+    <button class="btn ghost block" data-act="import">${icon('up')}กู้คืนข้อมูล / รูป จากไฟล์ (เลือกได้หลายไฟล์)</button>
+    ${prev ? `<button class="btn ghost block" data-act="prevrestore">ย้อนกลับไปสำเนาอัตโนมัติ (${esc(fmtDT(prev.t))} · ${esc(prev.why)})</button>` : ''}
+    ${bad ? `<button class="btn ghost block" data-act="badexport">${icon('down')}ส่งออกข้อมูลเดิมที่อ่านไม่ได้</button>` : ''}
     <button class="btn danger block" data-act="wipe">${icon('trash')}ลบข้อมูลทั้งหมด</button></div>
-    <p class="hint">ข้อมูลเก็บอยู่ในเครื่องนี้เท่านั้น ควรสำรองข้อมูลเป็นระยะ โดยเฉพาะก่อนล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง</p>`);
+    <p class="hint">สำรองข้อมูลล่าสุด: <b>${lb ? esc(fmtDT(lb)) : 'ยังไม่เคย'}</b><br>ข้อมูลเก็บอยู่ในเครื่องนี้เท่านั้น ควรสำรองเป็นระยะ โดยเฉพาะก่อนล้างข้อมูลเบราว์เซอร์หรือเปลี่ยนเครื่อง<br>iPhone: เพิ่มไอคอนลงหน้าจอหลัก (ปุ่มแชร์ &gt; เพิ่มไปยังหน้าจอโฮม) เพื่อลดโอกาสที่ Safari ล้างข้อมูล</p>
+    <p class="hint" id="stor"></p>`);
+  (async () => {
+    try {
+      const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
+      const pers = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : null, el = $('#stor');
+      if (el) el.innerHTML = `พื้นที่เก็บข้อมูล: ${est ? `ใช้ ${(est.usage / 1048576).toFixed(1)} MB จาก ${Math.round(est.quota / 1048576)} MB` : 'ไม่ทราบ'} · เก็บถาวร: ${pers === null ? 'ไม่ทราบ' : pers ? 'ใช่' : 'ยังไม่ได้รับสิทธิ์ (สำรองข้อมูลบ่อย ๆ)'}`;
+    } catch {}
+  })();
 }
 function demo() {
   const mk = (name, sku, spec) => ({ id: uid(), name, sku, variants: spec.flatMap(([c, qs]) => {
@@ -691,7 +782,7 @@ function demo() {
     mk('เสื้อยืดคอกลม', 'TS-001', [['ขาว', { S: 12, M: 20, L: 15, XL: 6 }], ['ดำ', { S: 8, M: 25, L: 18, XL: 0 }], ['น้ำเงิน', { M: 10, L: 7 }]]),
     mk('กางเกงยีนส์', 'JN-014', [['น้ำเงิน', { 28: 5, 30: 9, 32: 11, 34: 4 }], ['ดำ', { 30: 6, 32: 8 }]]),
     mk('หมวกแก๊ป', 'CP-220', [['แดง', { Free: 14 }], ['ดำ', { Free: 22 }], ['ครีม', { Free: 3 }]]));
-  save(); render();
+  ui.src = 'own'; save(); render();
 }
 
 /* ---------- POS import (pure logic) ---------- */
@@ -723,7 +814,7 @@ function parsePosRow(name, category, unit, stock) {
   if (ci >= 0) { color = colorOf(tokens[ci]); tokens.splice(ci, 1); }
 
   let size = '', extra = '';
-  if (variant && !BRAND_TAGS.has(variant.toUpperCase())) { if (SIZE_RE.test(variant)) size = variant.toUpperCase().replace(/^(\d)XL$/, '$1XL'); else extra = variant; }
+  if (variant && !BRAND_TAGS.has(variant.toUpperCase())) { if (SIZE_RE.test(variant)) size = variant.toUpperCase(); else extra = variant; }
   const si = tokens.findIndex(t => /^EUR\d+(\.\d)?$/i.test(t));
   if (si >= 0 && !size) { size = tokens[si].toUpperCase(); tokens.splice(si, 1); }
   tokens = tokens.filter(t => !NOISE_TOKENS.has(t.toUpperCase()));
@@ -762,16 +853,17 @@ function loadXLSX() {
 // compare a plan with what is already in the app (no changes made)
 function diffPos(plan) {
   const byPk = new Map(db.products.filter(p => p.pk).map(p => [p.pk, p]));
-  const d = { newP: 0, newV: 0, upd: 0, same: 0, missing: 0 };
+  const d = { newP: 0, newV: 0, upd: 0, same: 0, missing: 0, existing: 0 };
   plan.groups.forEach(g => {
     const p = byPk.get(g.pk);
     if (!p) { d.newP++; d.newV += g.variants.size; return; }
     g.variants.forEach(v => { const x = p.variants.find(y => y.vk === v.vk); if (!x) d.newV++; else if (x.qty !== v.qty) d.upd++; else d.same++; });
   });
-  byPk.forEach((p, pk) => { const g = plan.groups.get(pk); p.variants.forEach(x => { if (x.vk && !(g && g.variants.has(x.vk))) d.missing++; }); });
+  byPk.forEach((p, pk) => { const g = plan.groups.get(pk); p.variants.forEach(x => { if (!x.vk) return; d.existing++; if (!(g && g.variants.has(x.vk))) d.missing++; }); });
   return d;
 }
-function applyPos(plan) {
+// mode for rows that exist in the app but not in the file: keep (flag them) | zero | delete
+function applyPos(plan, mode = 'keep') {
   const byPk = new Map(db.products.filter(p => p.pk).map(p => [p.pk, p]));
   plan.groups.forEach(g => {
     let p = byPk.get(g.pk);
@@ -779,10 +871,21 @@ function applyPos(plan) {
     else { if (!p.category) p.category = g.category; if (!p.unit) p.unit = g.unit; }
     g.variants.forEach(v => {
       const x = p.variants.find(y => y.vk === v.vk);
-      if (x) x.qty = v.qty; else p.variants.push({ id: uid(), color: v.color, hex: v.hex, size: v.size, qty: v.qty, vk: v.vk });
+      if (x) { x.qty = v.qty; delete x.gone; } else p.variants.push({ id: uid(), color: v.color, hex: v.hex, size: v.size, qty: v.qty, vk: v.vk });
     });
   });
-  save();
+  const emptied = [];
+  byPk.forEach((p, pk) => {
+    const g = plan.groups.get(pk);
+    p.variants = p.variants.filter(x => {
+      if (!x.vk || (g && g.variants.has(x.vk))) return true; // hand-added variants and rows present in the file stay
+      if (mode === 'delete') return false;
+      x.gone = true; if (mode === 'zero') x.qty = 0; return true;
+    });
+    if (!p.variants.length) emptied.push(p);
+  });
+  if (emptied.length) { db.products = db.products.filter(x => !emptied.includes(x)); emptied.forEach(x => removeImage(x.id)); }
+  return save();
 }
 let posPlan = null;
 function posPreview(fileName) {
@@ -795,8 +898,13 @@ function posPreview(fileName) {
       <div class="row"><span style="flex:1">เพิ่มสี/ไซส์ใหม่ (ในสินค้าเดิมและใหม่)</span><b class="num">${d.newV}</b></div>
       <div class="row"><span style="flex:1">อัปเดตจำนวนสต็อก</span><b class="num">${d.upd}</b></div>
       <div class="row"><span style="flex:1">ไม่เปลี่ยนแปลง</span><b class="num">${d.same}</b></div></div>
-    <p class="hint">${P.neg ? `สต็อกติดลบ ${P.neg} แถว จะถูกปัดเป็น 0<br>` : ''}${P.skipped ? `ข้ามรายการบริการที่ตั้งสต็อกเป็นค่าสมมติ ${P.skipped} แถว<br>` : ''}${d.missing ? `มี ${d.missing} สี/ไซส์ที่เคยนำเข้าแต่ไม่พบในไฟล์นี้ จะคงไว้ไม่ลบ<br>` : ''}
+    <p class="hint">${P.neg ? `สต็อกติดลบ ${P.neg} แถว จะถูกปัดเป็น 0<br>` : ''}${P.skipped ? `ข้ามรายการบริการที่ตั้งสต็อกเป็นค่าสมมติ ${P.skipped} แถว<br>` : ''}
     การนำเข้าจะเขียนทับ <b>จำนวนสต็อก</b> ของรายการที่ตรงกัน ส่วนรูปและสินค้าที่คุณเพิ่มเองในแอปจะไม่ถูกแตะ<br>ระบบจะเก็บภาพสต็อกครั้งนี้ไว้ เพื่อคำนวณยอดขาย ขายดี/ขายไม่ดี เทียบกับครั้งก่อน (ครั้งที่ ${db.snaps.length + 1})</p>
+    ${d.missing ? `<div class="group" style="padding:12px 14px"><b>มี ${d.missing} สี/ไซส์ที่เคยนำเข้า แต่ไม่พบในไฟล์นี้</b>
+      ${d.existing > 20 && d.missing > d.existing * 0.5 ? '<div class="hint" style="color:var(--warn);margin:6px 0"><b>ไฟล์นี้ครอบคลุมน้อยกว่าครึ่งของรายการเดิม</b> อาจเป็นไฟล์ที่กรองมาบางส่วน ควรเลือก "คงไว้" ไปก่อน</div>' : ''}
+      <label class="pkr"><input type="radio" name="posmiss" value="keep" checked> คงไว้ และทำเครื่องหมาย "ไม่พบใน POS ล่าสุด" (แนะนำ)</label>
+      <label class="pkr"><input type="radio" name="posmiss" value="zero"> ตั้งจำนวนเป็น 0</label>
+      <label class="pkr"><input type="radio" name="posmiss" value="delete"> ลบรายการเหล่านั้น</label></div>` : ''}
     <div class="actions"><button class="btn primary block" data-act="posgo">นำเข้าเลย</button></div>`);
 }
 
@@ -902,29 +1010,27 @@ function renderOrders(seg) {
 }
 
 // ---- CSV export ----
-const csvCell = v => { const t = String(v ?? ''); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+const csvCell = v => { let t = String(v ?? ''); if (/^[=+\-@\t]/.test(t) && isNaN(Number(t))) t = "'" + t; return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }; // leading = + - @ would be run as a formula by Excel
 const csvPhone = p => p ? `="${p}"` : ''; // keeps the leading 0 in Excel / Sheets
-function downloadCSV(name, head, rows) {
+async function downloadCSV(name, head, rows) {
   const text = '\uFEFF' + [head.map(csvCell).join(','), ...rows.map(r => r.join(','))].join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
-  a.download = `${name}-${today()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  return saveFile(`${name}-${today()}.csv`, new Blob([text], { type: 'text/csv;charset=utf-8' }));
 }
-function exportOrders(list) {
+async function exportOrders(list) {
   if (!list.length) { toast('ไม่มีออเดอร์ให้ส่งออก'); return; }
   const names = new Map(customers().map(c => [c.phone, c.name]));
   const head = ['วันที่ฝากไม้', 'วันที่รับไม้', 'เบอร์โทร', 'ชื่อลูกค้า', 'ไม้', 'เอ็น', 'ค่าเอ็น (แนวตั้ง)', 'ค่าเอ็น (แนวนอน)', 'หน่วย', 'เว้นโปร', 'ปม', 'Pre %', 'ใช้สิทธิ์ขึ้นเอ็นฟรี', 'แต้มที่ได้', 'สถานะ', 'เสร็จเมื่อ', 'ด่วน', 'หมายเหตุ'];
   const rows = [...list].sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(o => [o.date, o.pickup || '', csvPhone(o.phone), names.get(o.phone) || '', o.racket, o.string, o.t, o.t2, o.t ? (o.unit === 'kg' ? 'kg' : 'lbs') : '',
     o.skip === 'skip' ? 'เว้นโปร' : '', o.knot === '4' ? '4 ปม' : '', o.pre || '', o.free ? 'ใช่' : '', o.free ? 0 : o.t ? 1 : 0, o.status === 'done' ? 'เสร็จแล้ว' : o.status === 'wait' ? 'รอทำ' : '', o.doneAt ? localDT(o.doneAt) : '', o.urgent ? 'ด่วน' : '', o.note]
     .map((v, i) => i === 2 ? v : csvCell(v)));
-  downloadCSV('stock-orders', head, rows); toast(`ส่งออก ${list.length} ออเดอร์แล้ว`);
+  if (await downloadCSV('stock-orders', head, rows)) toast(`ส่งออก ${list.length} ออเดอร์แล้ว`);
 }
-function exportCustomers() {
+async function exportCustomers() {
   const all = customers();
   if (!all.length) { toast('ยังไม่มีลูกค้า'); return; }
   const head = ['เบอร์โทร', 'ชื่อลูกค้า', 'จำนวนออเดอร์', 'ขึ้นเอ็นแล้ว (ครั้ง)', 'แต้มคงเหลือ', 'ใช้สิทธิ์ฟรี (ครั้ง)', 'มาล่าสุด', 'ไม้ล่าสุด', 'เอ็นล่าสุด', 'ค่าเอ็นล่าสุด'];
   const rows = all.map(c => { const P = pts(c); return [csvPhone(c.phone), c.name, c.orders.length, P.stringings, P.bal, P.freeUsed, c.last.date, c.last.racket, c.last.string, tensionText(c.last)].map((v, i) => i === 0 ? v : csvCell(v)); });
-  downloadCSV('stock-customers', head, rows); toast(`ส่งออก ${all.length} ลูกค้าแล้ว`);
+  if (await downloadCSV('stock-customers', head, rows)) toast(`ส่งออก ${all.length} ลูกค้าแล้ว`);
 }
 
 function renderCustList(seg) {
@@ -945,7 +1051,7 @@ function renderCustList(seg) {
     return;
   }
   if (!rows.length) {
-    $('#list').innerHTML = `<div class="empty"><svg class="big"><use href="#i-search"/></svg><h3>ไม่พบลูกค้า</h3>${numeric && qd.length >= 9 ? `<button class="btn" data-act="addo" data-phone="${qd}">เพิ่มออเดอร์ให้เบอร์ ${esc(fmtPhone(qd))}</button>` : 'ลองค้นหาด้วยเบอร์โทร ชื่อ หรือชื่อไม้'}</div>`;
+    $('#list').innerHTML = `<div class="empty"><svg class="big"><use href="#i-search"/></svg><h3>ไม่พบลูกค้า</h3>${numeric && normPhone(qd).length >= 9 ? `<button class="btn" data-act="addo" data-phone="${normPhone(qd)}">เพิ่มออเดอร์ให้เบอร์ ${esc(fmtPhone(normPhone(qd)))}</button>` : 'ลองค้นหาด้วยเบอร์โทร ชื่อ หรือชื่อไม้'}</div>`;
     return;
   }
   $('#list').innerHTML = rows.map((c, i) => `<button class="card" data-act="cust" data-phone="${c.phone}" style="animation-delay:${Math.min(i, 8) * 30}ms">
@@ -990,7 +1096,7 @@ function orderForm(o, phone, free) {
   const ph = o?.phone || phone || '';
   showLayer(2, `<h2>${o ? 'แก้ไขออเดอร์' : 'เพิ่มออเดอร์'}</h2>`, `<div class="form">
     <label>เบอร์โทรลูกค้า</label>
-    <input id="of-phone" class="field" type="tel" inputmode="tel" value="${esc(fmtPhone(digits(ph)))}" placeholder="เช่น 081-234-5678" autocomplete="off">
+    <input id="of-phone" class="field" type="tel" inputmode="tel" maxlength="20" value="${esc(fmtPhone(digits(ph)))}" placeholder="เช่น 081-234-5678" autocomplete="off">
     <div id="of-hint"></div>
     <label>ชื่อลูกค้า (ไม่บังคับ)</label>
     <input id="of-name" class="field" value="${esc(o?.name || c?.name || '')}" placeholder="เช่น คุณสมชาย" autocomplete="off">
@@ -998,8 +1104,8 @@ function orderForm(o, phone, free) {
     <input id="of-racket" class="field" list="dl-racket" value="${esc(o?.racket)}" placeholder="เช่น Yonex Astrox 88D" autocomplete="off">
     <div class="lrow"><label>เอ็นที่ใช้</label><button class="mini" data-act="pick" data-f="string">เลือกจากสต็อก</button></div>
     <input id="of-string" class="field" list="dl-string" value="${esc(o?.string)}" placeholder="เช่น BG65 Ti" autocomplete="off">
-    <label>ขึ้นเอ็นเท่าไหร่</label>
-    <div class="inline"><input id="of-t" class="field" type="number" inputmode="decimal" step="0.5" min="0" value="${esc(o?.t)}" placeholder="ค่าเอ็น (แนวตั้ง)"><input id="of-t2" class="field" type="number" inputmode="decimal" step="0.5" min="0" value="${esc(o?.t2)}" placeholder="แนวนอน (ถ้าต่าง)"></div>
+    <label>ขึ้นเอ็นเท่าไหร่ (แนวนอนใส่เมื่อต่างจากแนวตั้ง)</label>
+    <div class="inline"><input id="of-t" class="field" type="number" inputmode="decimal" step="0.5" min="0" value="${esc(o?.t)}" placeholder="แนวตั้ง"><input id="of-t2" class="field" type="number" inputmode="decimal" step="0.5" min="0" value="${esc(o?.t2)}" placeholder="แนวนอน"></div>
     <div class="seg" id="of-unit"><button data-act="unit" data-v="lbs" class="${of.unit === 'lbs' ? 'on' : ''}">ปอนด์ (lbs)</button><button data-act="unit" data-v="kg" class="${of.unit === 'kg' ? 'on' : ''}">กิโลกรัม (kg)</button></div>
     <label>รูปแบบการขึ้นเอ็น (ติ๊กเลือก)</label>
     <div class="opts">
@@ -1027,7 +1133,7 @@ function orderForm(o, phone, free) {
   if (!o && !phone) setTimeout(() => $('#of-phone')?.focus(), 80);
 }
 function updatePhoneHint() {
-  const d = digits($('#of-phone').value);
+  const d = normPhone($('#of-phone').value);
   const c = !of.id && d.length >= 9 ? customers().find(x => x.phone === d) : null;
   of.match = c;
   $('#of-hint').innerHTML = c ? `<div class="hintcard"><div><b>ลูกค้าเดิม${c.name ? ': ' + esc(c.name) : ''}</b> · ${c.orders.length} ออเดอร์<br><small>ล่าสุด: ${esc(orderLine(c.last)) || '—'}${tensionText(c.last) ? ' · ' + esc(tensionText(c.last)) : ''}${optList(c.last).length ? ' · ' + esc(optList(c.last).join(' ')) : ''}</small></div><button class="mini" data-act="reuse">ใช้ค่าเดิม</button></div>` : '';
@@ -1035,7 +1141,7 @@ function updatePhoneHint() {
   updatePts();
 }
 function updatePts() {
-  const d = digits($('#of-phone').value), el = $('#of-pts'); if (!el) return;
+  const d = normPhone($('#of-phone').value), el = $('#of-pts'); if (!el) return;
   if (d.length < 9) { el.innerHTML = ''; return; }
   const c = customers().find(x => x.phone === d) || { phone: d, orders: [] }, P = pts(c, of.id);
   if ($('#of-free').checked) el.innerHTML = `ใช้สิทธิ์ฟรี: หัก <b>${P.g}</b> แต้ม (มี ${P.bal} → เหลือ ${Math.max(0, P.bal - P.g)})${P.bal < P.g ? ' <span style="color:var(--danger)">แต้มยังไม่ครบ</span>' : ''}`;
@@ -1054,11 +1160,11 @@ function setUnit(u) { of.unit = u; document.querySelectorAll('#of-unit button').
 
 /* ---------- pick racket / string from stock ---------- */
 let pk = null;
-function pickStock(field) { pk = { field, q: '', prod: null }; renderPicker(); }
+function pickStock(field) { pk = { field, q: '', prod: null, src: ui.src }; renderPicker(); }
 function renderPicker() {
   const title = pk.field === 'racket' ? 'เลือกไม้จากสต็อก' : 'เลือกเอ็นจากสต็อก';
   if (pk.prod) {
-    const p = product(pk.prod);
+    const p = product(pk.prod); if (!p) { pk.prod = null; return renderPicker(); }
     const vs = [...p.variants].sort((a, b) => a.color.localeCompare(b.color) || bySize(a, b));
     showLayer(3, `<h2>${title}</h2>`, `<button class="back" data-act="pkback">${icon('minus')} กลับไปเลือกสินค้า</button>
       <div class="card-top" style="margin-bottom:14px">${avatar(p, [...new Set(vs.map(v => v.hex))])}
@@ -1068,13 +1174,14 @@ function renderPicker() {
       <div class="actions"><button class="btn ghost block" data-act="pkv" data-id="">ใช้ชื่อสินค้าอย่างเดียว</button></div>`);
     return;
   }
-  showLayer(3, `<h2>${title}</h2>`, `<div class="search"><svg><use href="#i-search"/></svg><input id="pk-q" type="search" placeholder="ค้นหาชื่อหรือรหัสสินค้า" value="${esc(pk.q)}" autocomplete="off"></div><div id="pk-list" style="margin-top:12px"></div>`);
+  showLayer(3, `<h2>${title}</h2>`, `<div class="seg" style="margin:0 0 12px"><button class="${pk.src === 'pos' ? 'on' : ''}" data-act="pksrc" data-v="pos">สต็อกจาก POS</button><button class="${pk.src === 'own' ? 'on' : ''}" data-act="pksrc" data-v="own">สต็อกเพิ่มเอง</button></div><div class="search"><svg><use href="#i-search"/></svg><input id="pk-q" type="search" placeholder="ค้นหาชื่อหรือรหัสสินค้า" value="${esc(pk.q)}" autocomplete="off"></div><div id="pk-list" style="margin-top:12px"></div>`);
   pickList();
 }
 function pickList() {
   const q = pk.q.trim().toLowerCase();
-  const rows = db.products.filter(p => !q || (p.name + ' ' + p.sku).toLowerCase().includes(q));
-  $('#pk-list').innerHTML = !db.products.length ? '<div class="empty">ยังไม่มีสินค้าในสต็อก<br>เพิ่มสินค้าในแท็บสต็อกก่อน หรือพิมพ์ชื่อเองในฟอร์มได้เลย</div>'
+  const pool = db.products.filter(p => pk.src === 'pos' ? p.pk : !p.pk);
+  const rows = pool.filter(p => !q || (p.name + ' ' + p.sku).toLowerCase().includes(q));
+  $('#pk-list').innerHTML = !pool.length ? '<div class="empty">ยังไม่มีสินค้าในสต็อกชุดนี้<br>ลองสลับชุดด้านบน หรือพิมพ์ชื่อเองในฟอร์มได้เลย</div>'
     : !rows.length ? '<div class="empty">ไม่พบสินค้า</div>'
     : rows.map(p => `<button class="card pk-item" data-act="pkp" data-id="${p.id}" style="animation:none">
         <div class="card-top">${avatar(p, [...new Set(p.variants.map(v => v.hex))])}
@@ -1109,7 +1216,7 @@ function renderQueue() {
   const todayStr = today();
   $('#summary').innerHTML =
     `<div class="stat"><b>${wait.length}</b><span>รอทำ</span></div>` +
-    `<div class="stat ${wait.some(o => o.pickup && o.pickup <= todayStr) ? 'alert' : ''}"><b>${wait.filter(o => o.pickup && o.pickup <= todayStr).length}</b><span>ถึงกำหนด/เลยกำหนด</span></div>` +
+    `<div class="stat ${wait.some(o => o.urgent || (o.pickup && o.pickup <= todayStr)) ? 'alert' : ''}"><b>${wait.filter(o => o.urgent || (o.pickup && o.pickup <= todayStr)).length}</b><span>ต้องรีบทำ</span></div>` +
     `<div class="stat"><b>${done.filter(o => localDT(o.doneAt).startsWith(todayStr)).length}</b><span>เสร็จวันนี้</span></div>`;
   const chip = (act, v, cur, label) => `<button class="chip ${cur === v ? 'on' : ''}" data-act="${act}" data-v="${v}">${label}</button>`;
   $('#filters').innerHTML = `<div class="seg"><button class="${ui.qview === 'wait' ? 'on' : ''}" data-act="qview" data-v="wait">รอทำ (${wait.length})</button><button class="${ui.qview === 'done' ? 'on' : ''}" data-act="qview" data-v="done">เสร็จแล้ว (${done.length})</button></div>` +
@@ -1143,7 +1250,7 @@ function renderQueue() {
 
 function setJobStatus(id, status) {
   const o = db.orders.find(x => x.id === id); if (!o) return;
-  o.status = status; o.doneAt = status === 'done' ? new Date().toISOString() : '';
+  o.status = status; o.doneAt = status === 'done' ? new Date().toISOString() : ''; o.u = nowIso();
   save(); render(); if (!$('#l1').hidden && ui.cust) renderCustDetail();
 }
 
@@ -1157,7 +1264,7 @@ function setTab(t) {
 }
 function demoOrders() {
   const d = n => { const x = new Date(); x.setDate(x.getDate() - n); return ymd(x); };
-  const o = (phone, name, racket, string, t, t2, date, note = '') => ({ id: uid(), phone, name, racket, string, t, t2, unit: 'lbs', date: d(date), note });
+  const o = (phone, name, racket, string, t, t2, date, note = '') => ({ id: uid(), phone, name, racket, string, t, t2, unit: 'lbs', date: d(date), note, u: nowIso() });
   db.orders.push(
     o('0812345678', 'คุณสมชาย', 'Yonex Astrox 88D Pro', 'BG65 Ti', '26', '', 30), o('0812345678', 'คุณสมชาย', 'Yonex Astrox 88D Pro', 'BG65 Ti', '27', '', 2, 'ขอตึงขึ้นนิด'),
     o('0898765432', 'พี่ต้น', 'Victor Thruster K 9900', 'Victor VBS-63', '24', '22', 9), o('0861112233', '', 'Li-Ning Windstorm 72', 'Li-Ning No.1', '25', '', 15));
@@ -1165,6 +1272,51 @@ function demoOrders() {
   w[0].status = 'done'; w[0].doneAt = new Date().toISOString();
   Object.assign(w[1], { status: 'wait', pickup: off(1), urgent: true }); Object.assign(w[2], { status: 'wait', pickup: off(-1) }); Object.assign(w[3], { status: 'wait', pickup: off(4) });
   save(); render();
+}
+
+/* ---------- hand-off of customers + queue between two phones ---------- */
+function nowIso() { return new Date().toISOString(); }
+function pruneTomb() { const cut = new Date(Date.now() - 180 * 864e5).toISOString(); Object.keys(db.tomb).forEach(k => { if (db.tomb[k] < cut) delete db.tomb[k]; }); }
+// The file carries orders (customers, history, queue status), deletions and points adjustments - never stock.
+function buildOrdersFile() { return { kind: 'orders', v: 1, t: nowIso(), orders: db.orders, tomb: db.tomb, adj: db.adj, adjAt: db.adjAt }; }
+// Merge rule: newest edit of the same order wins, new orders are added, deletions made after the last edit are honoured.
+function planMerge(d) {
+  const inc = normalizeDb({ orders: d.orders, tomb: d.tomb, adj: d.adj, adjAt: d.adjAt }).db;
+  const tomb = { ...db.tomb }; Object.entries(inc.tomb).forEach(([id, t]) => { if (!tomb[id] || t > tomb[id]) tomb[id] = t; });
+  const local = new Map(db.orders.map(o => [o.id, o]));
+  const plan = { add: [], upd: [], del: [], same: 0, skipped: 0, tomb, adj: {}, adjAt: {} };
+  inc.orders.forEach(o => {
+    const tb = tomb[o.id], l = local.get(o.id);
+    if (tb && tb >= (o.u || '')) { plan.skipped++; return; } // deleted on one of the phones after its last edit
+    if (!l) plan.add.push(o); else if ((o.u || '') > (l.u || '')) plan.upd.push(o); else plan.same++;
+  });
+  db.orders.forEach(l => { const tb = tomb[l.id]; if (tb && tb >= (l.u || '')) plan.del.push(l.id); });
+  Object.entries(inc.adj).forEach(([ph, v]) => {
+    const at = inc.adjAt[ph] || '', lt = db.adjAt[ph] || '';
+    if (!(ph in db.adj) || at > lt) { if (db.adj[ph] !== v) plan.adj[ph] = v; if (at) plan.adjAt[ph] = at; }
+  });
+  return plan;
+}
+function applyMerge(plan) {
+  keepPrev('ก่อนรวมข้อมูลลูกค้าและคิว');
+  const gone = new Set(plan.del), upd = new Map(plan.upd.map(o => [o.id, o]));
+  db.orders = db.orders.filter(o => !gone.has(o.id)).map(o => upd.get(o.id) || o).concat(plan.add);
+  db.tomb = plan.tomb; pruneTomb(); Object.assign(db.adj, plan.adj); Object.assign(db.adjAt, plan.adjAt);
+  return save();
+}
+let mergePending = null;
+function mergePreview(d, name) {
+  const plan = planMerge(d); mergePending = plan;
+  const changes = plan.add.length + plan.upd.length + plan.del.length + Object.keys(plan.adj).length;
+  showLayer(2, '<h2>รวมข้อมูลลูกค้าและคิว</h2>', `<div class="meta" style="white-space:normal;margin-bottom:12px">ไฟล์: ${esc(name)}<br>ส่งเมื่อ ${esc(d.t ? fmtDT(d.t) : '–')} · ${d.orders.length} ออเดอร์</div>
+    <div class="group" style="padding:6px 14px">
+      <div class="row" style="border:0"><span style="flex:1">ออเดอร์ใหม่ที่เพิ่มเข้ามา</span><b class="num">${plan.add.length}</b></div>
+      <div class="row"><span style="flex:1">อัปเดต (ฝั่งที่ส่งมาแก้ล่าสุดกว่า)</span><b class="num">${plan.upd.length}</b></div>
+      <div class="row"><span style="flex:1">ลบ (ลบไว้อีกเครื่อง)</span><b class="num">${plan.del.length}</b></div>
+      <div class="row"><span style="flex:1">ปรับแต้มสะสม</span><b class="num">${Object.keys(plan.adj).length}</b></div>
+      <div class="row"><span style="flex:1">ไม่เปลี่ยนแปลง (เครื่องนี้ใหม่กว่าหรือเท่ากัน)</span><b class="num">${plan.same}</b></div></div>
+    <p class="hint">รวมกับข้อมูลเดิมในเครื่องนี้ ไม่ทับทั้งหมด และไม่แตะสต็อก ถ้าออเดอร์เดียวกันถูกแก้ทั้งสองเครื่อง จะใช้อันที่แก้ล่าสุด (ดูจากเวลาเครื่อง จึงควรตั้งเวลาทั้งสองเครื่องให้ตรงกัน) ระบบเก็บสำเนาก่อนรวมไว้ให้ย้อนกลับได้ที่เมนู "⋯"</p>
+    <div class="actions"><button class="btn primary block" data-act="mergego" ${changes ? '' : 'disabled style="opacity:.5"'}>${changes ? 'รวมข้อมูล' : 'ไม่มีอะไรต้องรวม'}</button></div>`);
 }
 
 /* ---------- events ---------- */
@@ -1175,13 +1327,16 @@ document.addEventListener('click', async e => {
   switch (a) {
     case 'fcolor': ui.color = ui.color === v ? null : v; render(); break;
     case 'fsize': ui.size = ui.size === v ? null : v; render(); break;
+    case 'src': ui.src = v; ui.cat = ui.color = ui.size = null; ui.gone = false; render(); break;
+    case 'fgone': ui.gone = !ui.gone; render(); break;
+    case 'pksrc': pk.src = v; pk.q = ''; renderPicker(); break;
     case 'sview': ui.sview = v; render(); break;
     case 'sper': ui.sper = v; render(); break;
     case 'sfil': ui.sfilter = v; render(); break;
     case 'sales': ui.sdet = t.dataset.id; renderSalesDetail(); break;
     case 'gostock': ui.open = ui.sdet; renderDetail(); break;
     case 'snapnow': takeSnapshot('สต็อกปัจจุบัน'); render(); toast('บันทึกภาพสต็อกแล้ว นำเข้าไฟล์ POS ใหม่ภายหลังเพื่อคำนวณยอดขาย'); break;
-    case 'fclear': ui.cat = ui.color = ui.size = null; render(); break;
+    case 'fclear': ui.cat = ui.color = ui.size = null; ui.gone = false; render(); break;
     case 'fcat': ui.cat = ui.cat === v ? null : v; render(); break;
     case 'open': ui.open = t.dataset.id; renderDetail(); break;
     case 'close1': closeLayer(1); break;
@@ -1197,8 +1352,8 @@ document.addEventListener('click', async e => {
     case 'addo': orderForm(null, t.dataset.phone); break;
     case 'edito': orderForm(db.orders.find(x => x.id === t.dataset.id)); break;
     case 'delo': {
-      const o = db.orders.find(x => x.id === t.dataset.id);
-      if (confirm(`ลบออเดอร์วันที่ ${fmtDate(o.date)}?`)) { db.orders = db.orders.filter(x => x !== o); save(); render(); renderCustDetail(); }
+      const o = db.orders.find(x => x.id === t.dataset.id); if (!o) break;
+      if (confirm(`ลบออเดอร์วันที่ ${fmtDate(o.date)}?`)) { db.orders = db.orders.filter(x => x !== o); db.tomb[o.id] = nowIso(); pruneTomb(); save(); render(); renderCustDetail(); }
       break;
     }
     case 'unit': setUnit(v); break;
@@ -1206,7 +1361,7 @@ document.addEventListener('click', async e => {
     case 'qsort': ui.qsort = v; render(); break;
     case 'done': { buzz(); setJobStatus(t.dataset.id, 'done'); toast('บันทึกแล้ว ขึ้นเอ็นเสร็จเรียบร้อย'); break; }
     case 'undo': setJobStatus(t.dataset.id, 'wait'); toast('ย้อนกลับเป็นรอทำแล้ว'); break;
-    case 'urg': { const o = db.orders.find(x => x.id === t.dataset.id); if (o) { o.urgent = !o.urgent; save(); render(); if (!$('#l1').hidden && ui.cust) renderCustDetail(); } break; }
+    case 'urg': { const o = db.orders.find(x => x.id === t.dataset.id); if (o) { o.urgent = !o.urgent; o.u = nowIso(); save(); render(); if (!$('#l1').hidden && ui.cust) renderCustDetail(); } break; }
     case 'ost': of.status = v; document.querySelectorAll('#of-status button').forEach(b => b.classList.toggle('on', b.dataset.v === of.status)); break;
     case 'pd': { const d = new Date(); d.setDate(d.getDate() + Number(t.dataset.n)); $('#of-pickup').value = ymd(d); break; }
     case 'tgl': { const g = t.dataset.g; of.opts[g] = of.opts[g] === t.dataset.on ? t.dataset.off : t.dataset.on; syncOpts(); break; }
@@ -1218,7 +1373,7 @@ document.addEventListener('click', async e => {
     case 'csva': exportOrders(db.orders); break;
     case 'csvc': exportCustomers(); break;
     case 'redeem': orderForm(null, t.dataset.phone, true); break;
-    case 'adj': { db.adj[ui.cust] = (db.adj[ui.cust] || 0) + Number(t.dataset.d); save(); render(); renderCustDetail(); break; }
+    case 'adj': { db.adj[ui.cust] = (db.adj[ui.cust] || 0) + Number(t.dataset.d); db.adjAt[ui.cust] = nowIso(); save(); render(); renderCustDetail(); break; }
     case 'goalform':
       showLayer(2, '<h2>ตั้งค่าแต้มสะสม</h2>', `<div class="form"><label>ขึ้นเอ็นครบกี่ครั้ง ได้ขึ้นเอ็นฟรี 1 ครั้ง</label>
         <input id="set-goal" class="field" type="number" inputmode="numeric" min="1" value="${goal()}">
@@ -1232,8 +1387,8 @@ document.addEventListener('click', async e => {
     }
     case 'pick': pickStock(t.dataset.f); break;
     case 'pkback': pk.prod = null; renderPicker(); break;
-    case 'pkp': { pk.prod = t.dataset.id; const p = product(pk.prod); if (p.variants.length) renderPicker(); else applyPick(p, null); break; }
-    case 'pkv': { const p = product(pk.prod); applyPick(p, t.dataset.id ? p.variants.find(x => x.id === t.dataset.id) : null); break; }
+    case 'pkp': { pk.prod = t.dataset.id; const p = product(pk.prod); if (!p) break; if (p.variants.length) renderPicker(); else applyPick(p, null); break; }
+    case 'pkv': { const p = product(pk.prod); if (!p) break; applyPick(p, t.dataset.id ? p.variants.find(x => x.id === t.dataset.id) : null); break; }
     case 'reuse': {
       const l = of.match && of.match.last; if (!l) break;
       $('#of-racket').value = l.racket || ''; $('#of-string').value = l.string || '';
@@ -1242,13 +1397,13 @@ document.addEventListener('click', async e => {
     }
     case 'saveo2':
     case 'saveo': {
-      const phone = digits($('#of-phone').value);
-      if (phone.length < 9) { toast('กรุณากรอกเบอร์โทรให้ครบ'); return; }
+      const phone = normPhone($('#of-phone').value);
+      if (phone.length < 9 || phone.length > 15) { toast('เบอร์โทรควรมี 9–10 หลัก เช่น 081-234-5678'); return; }
       const rec = { phone, name: $('#of-name').value.trim(), racket: $('#of-racket').value.trim(), string: $('#of-string').value.trim(),
         t: $('#of-t').value.trim(), t2: $('#of-t2').value.trim(), unit: of.unit, date: $('#of-date').value || today(), note: $('#of-note').value.trim(), free: $('#of-free').checked ? goal() : 0, skip: of.opts.skip, knot: of.opts.knot, pre: of.opts.pre, pickup: $('#of-pickup').value };
       if (!rec.racket && !rec.string && !rec.t) { toast('กรอกไม้ เอ็น หรือค่าเอ็นอย่างน้อย 1 อย่าง'); return; }
       const prev = of.id ? db.orders.find(x => x.id === of.id) : null;
-      rec.urgent = $('#of-urgent').checked; rec.status = rec.t ? of.status : '';
+      rec.urgent = $('#of-urgent').checked; rec.status = rec.t ? of.status : ''; rec.u = nowIso();
       rec.doneAt = rec.status === 'done' ? ((prev && prev.doneAt) || new Date().toISOString()) : '';
       if (rec.free) {
         const P = pts(customers().find(x => x.phone === phone) || { phone, orders: [] }, of.id);
@@ -1272,7 +1427,7 @@ document.addEventListener('click', async e => {
       const sku = $('#pf-sku').value.trim(), category = $('#pf-cat').value.trim(), id = t.dataset.id;
       let pid = id;
       if (id) { const p = product(id); p.name = name; p.sku = sku; p.category = category; }
-      else { const p = { id: uid(), name, sku, category, variants: [] }; pid = p.id; db.products.unshift(p); ui.open = p.id; }
+      else { const p = { id: uid(), name, sku, category, variants: [] }; pid = p.id; db.products.unshift(p); ui.open = p.id; ui.src = 'own'; ui.cat = ui.color = ui.size = null; }
       save();
       try {
         if (pendingPhoto) await setImage(pid, pendingPhoto);
@@ -1281,7 +1436,7 @@ document.addEventListener('click', async e => {
       closeLayer(2); render(); renderDetail(); break;
     }
     case 'delp': {
-      const p = product(t.dataset.id);
+      const p = product(t.dataset.id); if (!p) break;
       if (confirm(`ลบ "${p.name}" และสต็อกทั้งหมดของสินค้านี้?`)) { db.products = db.products.filter(x => x !== p); save(); removeImage(p.id); closeLayer(2); closeLayer(1); }
       break;
     }
@@ -1290,7 +1445,7 @@ document.addEventListener('click', async e => {
     case 'inc': buzz(); setQty(v, n => n + 1); break;
     case 'dec': buzz(); setQty(v, n => n - 1); break;
     case 'delv': {
-      const p = product(ui.open), x = p.variants.find(y => y.id === v);
+      const p = product(ui.open), x = p && p.variants.find(y => y.id === v); if (!x) break;
       if (confirm(`ลบ ${x.color} ไซส์ ${x.size}?`)) { p.variants = p.variants.filter(y => y !== x); save(); renderDetail(); }
       break;
     }
@@ -1310,7 +1465,7 @@ document.addEventListener('click', async e => {
       if (!vf.pickColor) { toast('กรุณาเลือกสี'); return; }
       if (!vf.pickSizes.size) { toast('กรุณาเลือกไซส์อย่างน้อย 1 อัน'); return; }
       const qty = Math.max(0, Math.floor(Number($('#vf-qty').value)) || 0);
-      const p = product(ui.open), hex = vf.colors.get(vf.pickColor);
+      const p = product(ui.open), hex = vf.colors.get(vf.pickColor); if (!p) return;
       vf.pickSizes.forEach(size => {
         const ex = p.variants.find(x => x.color === vf.pickColor && x.size === size);
         if (ex) ex.qty += qty; else p.variants.push({ id: uid(), color: vf.pickColor, hex, size, qty });
@@ -1318,23 +1473,71 @@ document.addEventListener('click', async e => {
       save(); closeLayer(2); renderDetail(); break;
     }
     case 'export': {
-      const images = {};
-      try { for (const [id, blob] of await idbAll()) images[id] = await toDataURL(blob); } catch {}
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...db, images }, null, 2)], { type: 'application/json' }));
-      a.download = `stock-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      const blob = new Blob([JSON.stringify({ kind: 'data', v: 2, ...db })], { type: 'application/json' });
+      if (await saveFile(`stock-backup-${today()}.json`, blob)) { db.settings.lastBackup = new Date().toISOString(); save(); toast('สำรองข้อมูลแล้ว (ไม่รวมรูป ใช้ "สำรองรูปสินค้า" แยกต่างหาก)', 4000); }
       break;
+    }
+    case 'exportph': {
+      const all = await idbAll(); if (!all.length) { toast('ยังไม่มีรูปสินค้า'); break; }
+      toast('กำลังเตรียมไฟล์รูป...', 60000);
+      const parts = ['{"kind":"photos","images":{']; let first = true;
+      for (const [id, blob] of all) { parts.push((first ? '' : ',') + JSON.stringify(id) + ':' + JSON.stringify(await toDataURL(blob))); first = false; }
+      parts.push('}}');
+      toast(await saveFile(`stock-photos-${today()}.json`, new Blob(parts, { type: 'application/json' })) ? `สำรองรูป ${all.length} รูปแล้ว` : 'ยกเลิกการสำรองรูป');
+      break;
+    }
+    case 'exportorders': {
+      const stamp = localDT(nowIso()).slice(11).replace(':', '');
+      if (await saveFile(`stock-customers-queue-${today()}-${stamp}.json`, new Blob([JSON.stringify(buildOrdersFile())], { type: 'application/json' }))) toast(`เตรียมไฟล์แล้ว (${db.orders.length} ออเดอร์) ส่งไปอีกเครื่องแล้วกด "รับข้อมูลลูกค้าและคิว"`, 5000);
+      break;
+    }
+    case 'mergepick': $('#mergeFile').click(); break;
+    case 'mergego': {
+      if (!mergePending) break;
+      const plan = mergePending; mergePending = null;
+      if (applyMerge(plan)) { closeLayer(2); render(); toast(`รวมข้อมูลแล้ว: ใหม่ ${plan.add.length} · อัปเดต ${plan.upd.length} · ลบ ${plan.del.length}`, 4000); }
+      break;
+    }
+    case 'badexport': { let raw = null; try { raw = localStorage.getItem(BAD_KEY); } catch {} if (raw) await saveFile('stock-unreadable-data.txt', new Blob([raw], { type: 'text/plain' })); break; }
+    case 'prevrestore': {
+      const pv = prevInfo(); if (!pv) break;
+      if (!confirm(`กลับไปใช้สำเนาอัตโนมัติเมื่อ ${fmtDT(pv.t)} (${pv.why})?\nข้อมูลปัจจุบันจะถูกแทนที่ รูปสินค้าไม่เปลี่ยน`)) break;
+      const cur = db; keepPrev('ก่อนย้อนกลับสำเนา'); db = normalizeDb(pv.data).db;
+      if (!save()) { db = cur; break; }
+      ui.src = db.products.some(x => x.pk) ? 'pos' : 'own'; ui.cat = ui.color = ui.size = ui.cust = null; ui.gone = false; closeLayer(2); render(); toast('ย้อนกลับแล้ว');
+      break;
+    }
+    case 'gonezero':
+    case 'gonedel': {
+      const list = []; db.products.forEach(pp => { if (pp.pk) pp.variants.forEach(x => { if (x.gone) list.push([pp, x]); }); });
+      if (!list.length) break;
+      if (!confirm(a === 'gonezero' ? `ตั้งจำนวนเป็น 0 สำหรับ ${list.length} รายการที่ไม่พบในไฟล์ POS ล่าสุด?` : `ลบ ${list.length} รายการที่ไม่พบในไฟล์ POS ล่าสุด ถาวร?`)) break;
+      keepPrev(a === 'gonezero' ? 'ก่อนตั้งเป็น 0 (ไม่พบใน POS)' : 'ก่อนลบรายการที่ไม่พบใน POS');
+      if (a === 'gonezero') list.forEach(([, x]) => { x.qty = 0; });
+      else {
+        list.forEach(([pp, x]) => { pp.variants = pp.variants.filter(y => y !== x); });
+        db.products.filter(pp => pp.pk && !pp.variants.length).forEach(pp => removeImage(pp.id));
+        db.products = db.products.filter(pp => !pp.pk || pp.variants.length);
+      }
+      ui.gone = false; save(); render(); break;
     }
     case 'import': $('#importFile').click(); break;
     case 'posimport': $('#posFile').click(); break;
     case 'posgo': {
-      const d = diffPos(posPlan); applyPos(posPlan); takeSnapshot(posPlan.fileName); posPlan = null; closeLayer(2);
+      if (!posPlan) break;
+      const plan = posPlan, sel = document.querySelector('input[name=posmiss]:checked'), mode = sel ? sel.value : 'keep', d = diffPos(plan);
+      keepPrev('ก่อนนำเข้า POS');
+      const ok = applyPos(plan, mode) && takeSnapshot(plan.fileName);
+      posPlan = null; closeLayer(2); ui.src = 'pos'; ui.cat = ui.color = ui.size = null; ui.gone = false;
       if (ui.tab !== 'stock') setTab('stock'); else render();
-      toast(`นำเข้าแล้ว: สินค้าใหม่ ${d.newP} · สี/ไซส์ใหม่ ${d.newV} · อัปเดต ${d.upd}`); break;
+      if (ok) toast(`นำเข้าแล้ว: สินค้าใหม่ ${d.newP} · สี/ไซส์ใหม่ ${d.newV} · อัปเดต ${d.upd}`, 3500);
+      break;
     }
     case 'wipe':
-      if (confirm('ลบข้อมูลสินค้าและลูกค้าทั้งหมด? ย้อนกลับไม่ได้')) {
-        db = { products: [], orders: [], settings: db.settings, adj: {}, snaps: [] }; save(); closeLayer(2);
+      if (confirm('ลบข้อมูลสินค้า ลูกค้า และรูปทั้งหมด?\nระบบเก็บสำเนาข้อมูล (ไม่รวมรูป) ไว้ให้ย้อนกลับได้ แต่รูปสินค้าจะถูกลบถาวร ควรสำรองรูปก่อน')) {
+        keepPrev('ก่อนลบข้อมูลทั้งหมด');
+        db = normalizeDb({ settings: db.settings }).db; save(); closeLayer(2);
+        ui.src = 'own'; ui.cat = ui.color = ui.size = ui.cust = null; ui.gone = false;
         imgs.forEach(u => URL.revokeObjectURL(u)); imgs.clear();
         try { await idbRun('readwrite', s => s.clear()); } catch {}
         render();
@@ -1373,20 +1576,39 @@ $('#posFile').addEventListener('change', async e => {
     plan.fileName = f.name; posPlan = plan; posPreview(f.name);
   } catch { toast('อ่านไฟล์ไม่สำเร็จ ตรวจสอบว่าเป็นไฟล์ Excel/CSV จาก POS'); }
 });
-$('#importFile').addEventListener('change', async e => {
+$('#mergeFile').addEventListener('change', async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try {
-    const d = JSON.parse(await f.text());
-    if (!d || !Array.isArray(d.products)) throw 0;
-    if (!confirm(`กู้คืนสินค้า ${d.products.length} รายการ และออเดอร์ ${Array.isArray(d.orders) ? d.orders.length : 0} รายการ? ข้อมูลปัจจุบันจะถูกแทนที่`)) return;
-    const { images, ...data } = d; db = { ...data, orders: Array.isArray(data.orders) ? data.orders : [], settings: data.settings || { goal: 10 }, adj: data.adj || {}, snaps: Array.isArray(data.snaps) ? data.snaps : [] }; save(); closeLayer(2);
-    imgs.forEach(u => URL.revokeObjectURL(u)); imgs.clear();
-    try {
-      await idbRun('readwrite', s => s.clear());
-      for (const [id, url] of Object.entries(images || {})) if (product(id)) await setImage(id, await (await fetch(url)).blob());
-    } catch { toast('กู้คืนรูปบางส่วนไม่สำเร็จ'); }
-    render(); toast('กู้คืนข้อมูลแล้ว');
-  } catch { toast('ไฟล์ไม่ถูกต้อง'); }
+  let d; try { d = JSON.parse(await f.text()); } catch { toast('ไฟล์ไม่ถูกต้อง'); return; }
+  if (!d || d.kind !== 'orders' || !Array.isArray(d.orders)) { toast(d && Array.isArray(d.products) ? 'นี่เป็นไฟล์สำรองข้อมูลทั้งหมด ใช้ปุ่ม "กู้คืนข้อมูล / รูป" แทน' : 'ไม่ใช่ไฟล์ข้อมูลลูกค้าและคิว', 4500); return; }
+  mergePreview(d, f.name);
+});
+$('#importFile').addEventListener('change', async e => {
+  const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+  let dataFile = null; const photoSets = [];
+  for (const f of files) {
+    let d; try { d = JSON.parse(await f.text()); } catch { toast(`ไฟล์ ${f.name} ไม่ใช่ไฟล์สำรองที่ถูกต้อง`); return; }
+    if (d && d.kind === 'orders' && Array.isArray(d.orders) && !Array.isArray(d.products)) { if (files.length > 1) { toast('ไฟล์ข้อมูลลูกค้าและคิวเลือกได้ครั้งละ 1 ไฟล์ และแยกจากไฟล์สำรองข้อมูลทั้งหมด'); return; } mergePreview(d, f.name); return; }
+    if (d && Array.isArray(d.products)) { if (dataFile) { toast('เลือกไฟล์ข้อมูลได้ครั้งละ 1 ไฟล์'); return; } dataFile = d; }
+    else if (d && d.images && typeof d.images === 'object') photoSets.push(d.images);
+    else { toast(`ไฟล์ ${f.name} ไม่ใช่ไฟล์สำรองที่ถูกต้อง`); return; }
+  }
+  if (dataFile && dataFile.images && typeof dataFile.images === 'object') photoSets.push(dataFile.images); // older backups embedded the photos
+  const norm = dataFile ? normalizeDb(dataFile).db : null, nPh = photoSets.reduce((n, o) => n + Object.keys(o).length, 0);
+  const msg = norm ? `กู้คืนสินค้า ${norm.products.length} รายการ ออเดอร์ ${norm.orders.length} รายการ${nPh ? ` และรูป ${nPh} รูป` : ''}?\nข้อมูลปัจจุบันจะถูกแทนที่ (ระบบเก็บสำเนาก่อนหน้าไว้ให้ย้อนกลับได้)` : `เพิ่มรูปสินค้า ${nPh} รูป (เฉพาะสินค้าที่มีอยู่ในแอป)?`;
+  if (!confirm(msg)) return;
+  const blobs = []; // decode every photo first, so a bad file cannot leave the app half restored
+  try { for (const set of photoSets) for (const [id, url] of Object.entries(set)) blobs.push([id, await (await fetch(url)).blob()]); }
+  catch { toast('อ่านรูปในไฟล์ไม่สำเร็จ ยังไม่มีการเปลี่ยนแปลงข้อมูล', 4000); return; }
+  if (norm) {
+    const before = db; keepPrev('ก่อนกู้คืนจากไฟล์'); db = norm;
+    if (!save()) { db = before; return; }
+    ui.src = db.products.some(x => x.pk) ? 'pos' : 'own'; ui.cat = ui.color = ui.size = ui.cust = null; ui.gone = false;
+  }
+  let failed = 0;
+  for (const [id, blob] of blobs) if (product(id)) { try { await setImage(id, blob); } catch { failed++; } }
+  if (norm) for (const id of [...imgs.keys()]) if (!product(id)) await removeImage(id);
+  closeLayer(2); render();
+  toast(failed ? `กู้คืนแล้ว แต่รูปไม่สำเร็จ ${failed} รูป` : 'กู้คืนข้อมูลแล้ว', 3500);
 });
 
 render();
@@ -1397,6 +1619,12 @@ render();
   } catch {}
 })();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}
+if (loadNotice) toast('อ่านข้อมูลเดิมไม่ได้ ระบบเก็บสำเนาไว้แล้ว ดูที่เมนู "⋯" เพื่อส่งออกข้อมูลเดิม', 9000);
+else if (db.products.length || db.orders.length) {
+  const lb = db.settings.lastBackup, days = lb ? (Date.now() - new Date(lb)) / 864e5 : Infinity;
+  if (days > 7) toast(lb ? `ยังไม่ได้สำรองข้อมูลมา ${Math.floor(days)} วัน` : 'ยังไม่เคยสำรองข้อมูล กด "⋯" แล้วเลือกสำรองข้อมูล', 5000);
+}
 </script>
 </body>
 </html>

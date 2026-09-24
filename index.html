@@ -215,6 +215,8 @@ a.icon-btn{color:var(--brand);text-decoration:none}
 .done-btn{background:var(--ok);color:#fff;font-weight:600;padding:10px 16px;border-radius:14px;display:inline-flex;align-items:center;gap:6px;font-size:15px}
 .undo-btn{background:var(--chip);color:var(--muted);font-weight:600;padding:8px 14px;border-radius:12px;font-size:14px}
 .orow{display:block;width:100%;text-align:left;background:var(--surface);border-radius:16px;padding:11px 14px;box-shadow:var(--shadow)}
+/* long lists: cards off screen are not laid out until scrolled near (big saving on phones) */
+#list>.card,#list>.orow{content-visibility:auto;contain-intrinsic-size:auto 150px}
 .or-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .or-n{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .or-t{font-family:var(--head);color:var(--brand);font-weight:600;white-space:nowrap}
@@ -321,9 +323,12 @@ a.icon-btn{color:var(--brand);text-decoration:none}
 
 <script>
 'use strict';
-const KEY = 'stock-app-v1', PREV_KEY = KEY + '-prev', BAD_KEY = KEY + '-corrupt';
+const KEY = 'stock-app-v1', PREV_KEY = KEY + '-prev', BAD_KEY = KEY + '-corrupt', REV_KEY = KEY + '-rev';
 let loadNotice = '', skipClean = false;
+let badRaw = null; // unreadable old data that could not be copied aside (storage full): saving stays blocked until it is exported
 const PRESET_COLORS = [['ดำ','#1f1f1f'],['ขาว','#f5f5f5'],['เทา','#9e9e9e'],['แดง','#e53935'],['ชมพู','#f48fb1'],['ส้ม','#fb8c00'],['เหลือง','#fdd835'],['เขียว','#43a047'],['ฟ้า','#29b6f6'],['น้ำเงิน','#1e40af'],['ม่วง','#8e24aa'],['น้ำตาล','#795548'],['ครีม','#f3e5c8']];
+// order fields that are merged one by one between phones (see stampOrder); needed by normalizeDb at start-up
+const OFIELDS = ['phone', 'name', 'racket', 'string', 't', 't2', 'unit', 'date', 'pickup', 'note', 'free', 'skip', 'knot', 'pre', 'urgent', 'paid', 'status'];
 const PRESET_SIZES = ['2XS','XS','S','M','L','XL','2XL','3XL','4XL','5XL','Free'];
 
 const $ = s => document.querySelector(s);
@@ -335,7 +340,12 @@ const swatch = hex => `<i class="sw" style="background:${esc(hex)}"></i>`;
 const icon = n => `<svg><use href="#i-${n}"/></svg>`;
 const buzz = () => { try { navigator.vibrate && navigator.vibrate(8); } catch {} };
 
+// Revision stamp shared by every open window of the app (installed app + browser tab share the same storage).
+// Read before the data, so a save made in between shows up as a change rather than being missed.
+const readRev = () => { try { return localStorage.getItem(REV_KEY); } catch { return undefined; } };
+let myRev = readRev();
 let db = load();
+if (myRev === null) { try { myRev = uid(); localStorage.setItem(REV_KEY, myRev); } catch { myRev = null; } }
 const ui = { tab: 'stock', src: db.products.some(p => p.pk) ? 'pos' : 'own', cat: null, gone: false, q: '', cq: '', color: null, size: null, open: null, cust: null, sview: 'list', sper: 'last', sfilter: 'all', sdet: null, cview: 'cust', qview: 'wait', qsort: 'due', per: 'all', by: 'drop', from: '', to: '', shown: [] };
 
 /* ---------- product photos (IndexedDB, keyed by product id) ---------- */
@@ -418,7 +428,9 @@ function normalizeDb(d) {
     ...o, id: uniqId(o.id), phone: normPhone(o.phone), name: str(o.name), racket: str(o.racket), string: str(o.string), t: str(o.t), t2: str(o.t2), note: str(o.note),
     unit: o.unit === 'kg' ? 'kg' : 'lbs', date: isDay(o.date) ? o.date : new Date().toISOString().slice(0, 10), pickup: isDay(o.pickup) ? o.pickup : '',
     status: o.status === 'wait' || o.status === 'done' ? o.status : '', doneAt: str(o.doneAt), urgent: !!o.urgent, paid: !!o.paid, free: Math.max(0, n0(o.free)),
-    skip: o.skip === 'skip' ? 'skip' : str(o.skip), knot: str(o.knot), pre: str(o.pre), u: str(o.u) }));
+    skip: o.skip === 'skip' ? 'skip' : str(o.skip), knot: str(o.knot), pre: str(o.pre), u: str(o.u),
+    fb: typeof o.fb === 'string' && o.fb ? o.fb : undefined,
+    fu: o.fu && typeof o.fu === 'object' ? Object.fromEntries(Object.entries(o.fu).filter(([k, v]) => OFIELDS.includes(k) && typeof v === 'string')) : undefined }));
   const adj = {}; Object.entries(d.adj && typeof d.adj === 'object' ? d.adj : {}).forEach(([k, v]) => { const ph = normPhone(k); adj[ph] = (adj[ph] || 0) + n0(v); });
   const isoMap = m => { const out = {}; if (m && typeof m === 'object') Object.entries(m).forEach(([k, v]) => { if (typeof v === 'string') out[k] = v; }); return out; };
   const tomb = isoMap(d.tomb), adjAt = {};
@@ -432,12 +444,49 @@ function load() {
   let raw = null; try { raw = localStorage.getItem(KEY); } catch { skipClean = true; } // storage unreadable: an empty db must not be taken as "no data"
   if (!raw) return normalizeDb({}).db;
   try { const d = JSON.parse(raw); if (d && Array.isArray(d.products)) return normalizeDb(d).db; throw 0; }
-  catch { try { localStorage.setItem(BAD_KEY, raw); } catch {} loadNotice = 'bad'; return normalizeDb({}).db; } // keep the unreadable text, never overwrite it
+  catch { try { localStorage.setItem(BAD_KEY, raw); } catch { badRaw = raw; } loadNotice = 'bad'; return normalizeDb({}).db; } // keep the unreadable text, never overwrite it
+}
+// true when another window has saved since this one last loaded or saved
+const stale = () => { const r = readRev(); return r !== undefined && r !== myRev; };
+let syncTimer = 0;
+// Never write over another window's newer data: drop this change, and load the newer data right after the caller has finished
+// (callers that undo their in-memory change on a failed save run first, then the reload replaces everything).
+function conflict() {
+  toast('มีการแก้ข้อมูลจากหน้าต่างอื่นของแอป รายการล่าสุดนี้จึงยังไม่ถูกบันทึก โหลดข้อมูลล่าสุดให้แล้ว กรุณาทำอีกครั้ง', 7000);
+  clearTimeout(syncTimer); syncTimer = setTimeout(syncFromStorage, 0);
+  return false;
+}
+// The sales snapshots are a large part of the data but change only on a POS import, so their JSON is reused between saves.
+// Anything that changes db.snaps in place must bump snapsVer (a new array, a new length or a new last snapshot is noticed anyway).
+let snapsVer = 0, snapsCache = null;
+function dbJson() {
+  const S = db.snaps, last = S[S.length - 1], key = `${S.length}|${last ? last.t : ''}|${snapsVer}`;
+  if (!snapsCache || snapsCache.arr !== S || snapsCache.key !== key) snapsCache = { arr: S, key, json: JSON.stringify(S) };
+  const { snaps, ...rest } = db;
+  return JSON.stringify(rest).slice(0, -1) + ',"snaps":' + snapsCache.json + '}';
 }
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
+  if (stale()) return conflict();
+  if (badRaw !== null) { toast('ข้อมูลเดิมที่อ่านไม่ได้ยังไม่มีสำเนา (พื้นที่ในเครื่องไม่พอ) จึงยังบันทึกไม่ได้ เพื่อไม่ให้ทับของเดิม กด "⋯" แล้วเลือก "ส่งออกข้อมูลเดิมที่อ่านไม่ได้" ก่อน', 8000); return false; }
+  try { localStorage.setItem(KEY, dbJson()); }
   catch { toast('บันทึกลงเครื่องไม่สำเร็จ พื้นที่เต็มหรือถูกปิดไว้ ข้อมูลล่าสุดยังไม่ถูกเก็บ กรุณาสำรองข้อมูลทันที', 7000); return false; }
+  const r = uid();
+  try { localStorage.setItem(REV_KEY, r); myRev = r; } catch { try { localStorage.removeItem(REV_KEY); } catch {} myRev = null; } // a missing stamp still differs from every other window's
+  return true;
 }
+// Load what another window saved. Open forms stay open (their save then applies to the fresh data); previews built on the old data are closed.
+function syncFromStorage() {
+  const r = readRev(); if (r === undefined || r === myRev) return;
+  myRev = r; db = load();
+  if (mergePending) { mergePending = null; closeLayer(2); }
+  if (posPlan && !$('#l2').hidden && $('#l2 [data-act=posgo]')) { posPlan = null; closeLayer(2); }
+  render();
+  if (!$('#l1').hidden) { if (ui.open) renderDetail(); else if (ui.cust) renderCustDetail(); else if (ui.sdet) renderSalesDetail(); }
+  loadImgs(false).catch(() => {});
+}
+window.addEventListener('storage', e => { if (e.key === REV_KEY) { syncFromStorage(); toast('อัปเดตข้อมูลที่แก้จากหน้าต่างอื่นแล้ว'); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromStorage(); });
+window.addEventListener('pageshow', syncFromStorage);
 // one automatic safety copy of the data (without photos) before anything destructive
 // Tries the full copy first; if the browser is short on space it retries without the sales snapshots (noSnaps) so the copy still fits.
 function keepPrev(why) {
@@ -449,17 +498,44 @@ function keepPrev(why) {
 }
 // false = the user chose to stop because no safety copy could be stored
 function ensurePrev(why) {
+  if (stale()) return conflict(); // this window's data is out of date: it must not become the safety copy either
   return keepPrev(why) || confirm('เก็บสำเนาสำรองก่อนทำรายการนี้ไม่ได้ (พื้นที่ในเครื่องเต็ม)\nถ้าทำต่อ จะย้อนกลับไม่ได้ ทำต่อหรือไม่?\n(แนะนำให้กดยกเลิก แล้วสำรองข้อมูลเป็นไฟล์ก่อน)');
 }
 // puts the in-memory data back to an earlier JSON snapshot when saving to the device failed
 const revertTo = json => { db = normalizeDb(JSON.parse(json)).db; };
 function prevInfo() { try { const p = JSON.parse(localStorage.getItem(PREV_KEY)); return p && p.data ? p : null; } catch { return null; } }
+// Photos are not inside the automatic safety copy, so a photo whose product/order is still in that copy is kept:
+// "undo" then brings the photo back too. It is cleaned up only once a newer copy no longer needs it.
+function prevOwns() {
+  const pv = prevInfo(), ids = new Set();
+  if (pv) ['products', 'orders'].forEach(k => { if (Array.isArray(pv.data[k])) pv.data[k].forEach(x => { if (x && typeof x.id === 'string') ids.add(x.id); }); });
+  return k => ids.has(isOrderKey(k) ? k.split(':')[1] : k);
+}
+// Show the photos that belong to the current data (after a restore, an undo or a change from another window).
+// clean = also delete photos nobody owns, neither the data nor the safety copy
+async function loadImgs(clean) {
+  const all = await idbAll(), kept = clean ? prevOwns() : null; let added = 0;
+  for (const [id, blob] of all) {
+    if (imgOwned(id)) { if (!imgs.has(id)) { imgs.set(id, URL.createObjectURL(blob)); added++; } }
+    else if (clean && !kept(id)) removeImage(id);
+  }
+  if (added) { render(); if (!$('#l1').hidden) { if (ui.open) renderDetail(); else if (ui.cust) renderCustDetail(); } }
+}
 // iOS home-screen apps often ignore <a download>; the share sheet ("Save to Files") is the reliable route there
 async function saveFile(name, blob) {
   const file = new File([blob], name, { type: blob.type });
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (ios && navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: name }); return true; } catch (err) { if (err && err.name === 'AbortError') return false; }
+  }
+  // Chrome/Edge on a computer: a real "Save as" dialog tells us when the user cancels, so a cancelled backup is not counted as done.
+  // (<a download> below cannot report that; where the picker is missing or refuses, e.g. after a long wait, fall back to it.)
+  if (window.showSaveFilePicker && !ios) {
+    try {
+      const ext = name.slice(name.lastIndexOf('.'));
+      const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: name, accept: { [blob.type.split(';')[0] || 'application/octet-stream']: [ext] } }] });
+      const w = await h.createWritable(); await w.write(blob); await w.close(); return true;
+    } catch (err) { if (err && err.name === 'AbortError') return false; }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 60000); return true;
@@ -507,6 +583,16 @@ function render() {
   const n = db.orders.filter(o => o.status === 'wait').length, b = $('#qbadge');
   b.textContent = n > 99 ? '99+' : n; b.hidden = !n;
 }
+// Long lists show PAGE items at a time: laying out thousands of cards takes seconds on a phone. Any change of view, filter or
+// search starts again from the first page; summaries and CSV export still use the whole list.
+const PAGE = 150;
+let limKey = '';
+function pageLimit() {
+  const k = [ui.tab, ui.cview, ui.src, ui.sview, ui.cat, ui.color, ui.size, ui.gone, ui.q, ui.cq, ui.per, ui.by, ui.from, ui.to].join('');
+  if (k !== limKey) { limKey = k; ui.lim = PAGE; }
+  return ui.lim;
+}
+const moreBtn = rest => rest > 0 ? `<button class="btn ghost block" data-act="more" style="margin-top:12px">แสดงเพิ่ม (อีก ${rest.toLocaleString()} รายการ)</button>` : '';
 const catRow = cats => cats.length > 1 ? `<div class="frow"><span class="lbl">หมวด</span>${cats.map(c =>
   `<button class="chip ${ui.cat === c ? 'on' : ''}" data-act="fcat" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : '';
 
@@ -528,7 +614,7 @@ function takeSnapshot(fileName) {
   db.products.forEach(p => { if (p.pk) p.variants.forEach(v => { if (v.vk && v.qty > 0) q[snapKey(p, v)] = v.qty; }); });
   const last = db.snaps[db.snaps.length - 1], ks = Object.keys(q);
   if (last && ks.length === Object.keys(last.q).length && ks.every(k => last.q[k] === q[k])) return true; // same stock as the last snapshot (same file imported twice): nothing sold, and a duplicate would only make the "latest" period empty
-  db.snaps.push({ t: new Date().toISOString(), f: fileName || '', q });
+  db.snaps.push({ t: new Date().toISOString(), f: fileName || '', q }); snapsVer++;
   if (db.snaps.length > SNAP_MAX) db.snaps.splice(0, db.snaps.length - SNAP_MAX);
   return save();
 }
@@ -695,7 +781,8 @@ function renderStock() {
   if (!rows.length) { $('#list').innerHTML = `<div class="empty"><svg class="big"><use href="#i-search"/></svg><h3>ไม่พบสินค้า</h3>ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</div>`; return; }
 
   const goneBanner = ui.gone ? `<div class="banner-i"><b>${goneN} สินค้ามีรายการที่ไม่พบในไฟล์ POS ล่าสุด</b><br>อาจถูกลบหรือเปลี่ยนชื่อใน POS จำนวนที่เห็นเป็นค่าเก่า จัดการทั้งหมดได้ที่นี่ (ระบบเก็บสำเนาไว้ให้ย้อนกลับ)<br><button class="btn ghost" data-act="gonezero">ตั้งจำนวนเป็น 0</button> <button class="btn danger" data-act="gonedel">ลบรายการเหล่านี้</button></div>` : '';
-  $('#list').innerHTML = goneBanner + rows.map(({ p, vs }, i) => {
+  const lim = pageLimit();
+  $('#list').innerHTML = goneBanner + rows.slice(0, lim).map(({ p, vs }, i) => {
     const groups = byColor(vs), sum = total(vs), out = vs.filter(v => v.qty === 0).length;
     const badge = !vs.length ? '' : sum === 0 ? '<span class="badge">หมดสต็อก</span>' : out ? `<span class="badge warn">หมด ${out} ไซส์</span>` : '';
     const sizeSet = [...new Set(vs.map(v => v.size))].sort((a, b) => sizeRank(a) - sizeRank(b));
@@ -708,7 +795,7 @@ function renderStock() {
       <div class="pills">${[...groups].map(([c, g]) => `<span class="pill">${swatch(g.hex)}${esc(c)} <b class="num">${g.n}</b></span>`).join('')}${badge}${vs.some(v => v.gone) ? '<span class="badge mut">ไม่พบใน POS ล่าสุด</span>' : ''}</div>`
       : '<div class="meta" style="margin-top:10px">ยังไม่มีสี/ไซส์ แตะเพื่อเพิ่ม</div>'}
     </button>`;
-  }).join('');
+  }).join('') + moreBtn(rows.length - lim);
 }
 
 /* ---------- layers ---------- */
@@ -803,7 +890,7 @@ function renderVariantForm() {
 /* ---------- menu / backup ---------- */
 function menu() {
   const prev = prevInfo(), lb = db.settings.lastBackup;
-  let bad = false; try { bad = !!localStorage.getItem(BAD_KEY); } catch {}
+  let bad = badRaw !== null; try { bad = bad || !!localStorage.getItem(BAD_KEY); } catch {}
   showLayer(2, '<h2>เมนู</h2>', `<div class="actions" style="margin-top:4px">
     <button class="btn primary block" data-act="exportorders">${icon('down')}ส่งข้อมูลลูกค้าและคิวไปอีกเครื่อง</button>
     <button class="btn ghost block" data-act="mergepick">${icon('up')}รับข้อมูลลูกค้าและคิวจากอีกเครื่อง (รวมกัน)</button>
@@ -945,7 +1032,7 @@ function applyPos(plan, mode = 'keep') {
       if (p.pk !== g.pk) { // category changed in POS: follow it, and re-key the sales history so it stays attached
         const oldKeys = p.variants.filter(x => x.vk).map(x => [x, snapKey(p, x)]), oldCat = p.pk.slice(0, p.pk.indexOf('|'));
         p.pk = g.pk; if (!p.category || p.category === oldCat) p.category = g.category;
-        oldKeys.forEach(([x, ok]) => { const nk = snapKey(p, x); db.snaps.forEach(s => { if (ok in s.q) { s.q[nk] = s.q[ok]; delete s.q[ok]; } }); });
+        oldKeys.forEach(([x, ok]) => { const nk = snapKey(p, x); db.snaps.forEach(s => { if (ok in s.q) { s.q[nk] = s.q[ok]; delete s.q[ok]; } }); }); snapsVer++;
       }
       if (!p.category) p.category = g.category; if (!p.unit) p.unit = g.unit;
     }
@@ -965,8 +1052,7 @@ function applyPos(plan, mode = 'keep') {
     });
     if (!p.variants.length) emptied.push(p);
   });
-  if (emptied.length) db.products = db.products.filter(x => !emptied.includes(x));
-  plan.dropImgs = emptied.map(x => x.id); // photos are removed by the caller only after the data has been saved
+  if (emptied.length) db.products = db.products.filter(x => !emptied.includes(x)); // their photos stay while the safety copy needs them
   return save();
 }
 let posPlan = null;
@@ -1081,15 +1167,16 @@ function renderOrders(seg) {
   }
   if (!list.length) { $('#list').innerHTML = `<div class="empty"><svg class="big"><use href="#i-search"/></svg><h3>ไม่พบออเดอร์</h3>ลองเปลี่ยนช่วงวันที่หรือคำค้นหา</div>`; return; }
 
-  const groups = new Map();
-  list.forEach(o => { const k = o[by] || ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); });
+  const lim = pageLimit(), groups = new Map(), dayN = new Map();
+  list.forEach(o => { const k = o[by] || ''; dayN.set(k, (dayN.get(k) || 0) + 1); });
+  list.slice(0, lim).forEach(o => { const k = o[by] || ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); });
   const keys = [...groups.keys()].sort((a, b) => a === '' ? 1 : b === '' ? -1 : b.localeCompare(a)); // newest first, "no date" last
-  $('#list').innerHTML = keys.map(k => `<div class="dh"><b>${k ? esc(fmtDay(k)) : 'ไม่ระบุวันรับ'}</b><span>${groups.get(k).length} ไม้</span></div>` +
+  $('#list').innerHTML = keys.map(k => `<div class="dh"><b>${k ? esc(fmtDay(k)) : 'ไม่ระบุวันรับ'}</b><span>${dayN.get(k)} ไม้</span></div>` +
     groups.get(k).map(o => `<button class="orow" data-act="cust" data-phone="${o.phone}">
       <div class="or-top"><span class="or-n">${esc(names.get(o.phone) || fmtPhone(o.phone))}</span>${tensionText(o) ? `<span class="or-t">${esc(tensionText(o))}</span>` : ''}</div>
       <div class="meta">${names.get(o.phone) ? esc(fmtPhone(o.phone)) + ' · ' : ''}${esc(orderLine(o)) || '—'}</div>
       <div class="tags">${ui.by === 'drop' ? (o.pickup ? `<span class="tag">รับ ${esc(fmtDate(o.pickup))}</span>` : '') : `<span class="tag">ฝาก ${esc(fmtDate(o.date))}</span>`}${tagsHtml(o)}${o.free ? '<span class="badge ok">ฟรี</span>' : ''}${o.status === 'wait' ? '<span class="badge warn">รอทำ</span>' : o.status === 'done' ? '<span class="badge ok">เสร็จแล้ว</span>' : ''}</div>
-    </button>`).join('')).join('');
+    </button>`).join('')).join('') + moreBtn(list.length - lim);
 }
 
 // ---- CSV export ----
@@ -1137,7 +1224,8 @@ function renderCustList(seg) {
     $('#list').innerHTML = `<div class="empty"><svg class="big"><use href="#i-search"/></svg><h3>ไม่พบลูกค้า</h3>${numeric && normPhone(qd).length >= 9 ? `<button class="btn" data-act="addo" data-phone="${normPhone(qd)}">เพิ่มออเดอร์ให้เบอร์ ${esc(fmtPhone(normPhone(qd)))}</button>` : 'ลองค้นหาด้วยเบอร์โทร ชื่อ หรือชื่อไม้'}</div>`;
     return;
   }
-  $('#list').innerHTML = rows.map((c, i) => `<button class="card" data-act="cust" data-phone="${c.phone}" style="animation-delay:${Math.min(i, 8) * 30}ms">
+  const lim = pageLimit();
+  $('#list').innerHTML = rows.slice(0, lim).map((c, i) => `<button class="card" data-act="cust" data-phone="${c.phone}" style="animation-delay:${Math.min(i, 8) * 30}ms">
     <div class="card-top">${avatarC(c)}
       <div class="info"><div class="name">${esc(c.name || fmtPhone(c.phone))}</div>
         <div class="meta">${c.name ? esc(fmtPhone(c.phone)) + ' · ' : ''}${c.orders.length} ออเดอร์${c.orders.some(o => o.status === 'wait') ? ` · <b style="color:var(--warn)">รอทำ ${c.orders.filter(o => o.status === 'wait').length}</b>` : ''}</div></div>
@@ -1145,7 +1233,7 @@ function renderCustList(seg) {
     <div class="last"><span>${esc(orderLine(c.last)) || '—'}</span>${tensionText(c.last) ? `<b>${esc(tensionText(c.last))}</b>` : ''}</div>
     ${optList(c.last).length ? `<div class="tags" style="margin-top:8px">${tagsHtml(c.last)}</div>` : ''}
     ${(P => `<div class="ptsrow"><span>แต้ม <b class="num">${Math.min(P.bal, P.g)}/${P.g}</b></span><div class="pbar"><i style="width:${Math.round(Math.min(P.bal, P.g) / P.g * 100)}%"></i></div>${P.ready ? '<span class="badge ok">แลกฟรีได้</span>' : ''}</div>`)(pts(c))}
-  </button>`).join('');
+  </button>`).join('') + moreBtn(rows.length - lim);
 }
 
 function renderCustDetail() {
@@ -1341,7 +1429,7 @@ function renderQueue() {
 const payBtn = o => `<button class="badge paybtn ${o.paid ? 'ok' : 'warn'}" data-act="pay" data-id="${o.id}">${o.paid ? 'จ่ายแล้ว' : 'ยังไม่จ่าย'}</button>`;
 function setJobStatus(id, status) {
   const o = db.orders.find(x => x.id === id); if (!o) return;
-  o.status = status; o.doneAt = status === 'done' ? new Date().toISOString() : ''; o.u = nowIso();
+  editOrder(o, x => { x.status = status; x.doneAt = status === 'done' ? new Date().toISOString() : ''; });
   save(); render(); if (!$('#l1').hidden && ui.cust) renderCustDetail();
 }
 
@@ -1367,6 +1455,35 @@ function demoOrders() {
 
 /* ---------- hand-off of customers + queue between two phones ---------- */
 function nowIso() { return new Date().toISOString(); }
+// Each order remembers when each of its fields was last changed, so a merge takes every field from the phone that changed it last:
+// one phone marking "done" and the other marking "paid" on the same order keeps both. Kept small (storage is limited):
+// o.fb = time of all fields not listed in o.fu, o.fu = { field: time } for fields edited after that. Orders without them
+// (new, or saved before this existed) count every field as changed at o.u. status carries doneAt with it.
+const fVal = (o, f) => f === 'status' ? `${o.status}|${o.doneAt}` : String(o[f] ?? '');
+const fTime = (o, f) => (o.fu && o.fu[f]) || o.fb || o.u || '';
+function packTimes(o, times) { // times = { field: time } for every field
+  const fb = OFIELDS.reduce((a, f) => times[f] < a ? times[f] : a, times[OFIELDS[0]]), fu = {};
+  OFIELDS.forEach(f => { if (times[f] !== fb) fu[f] = times[f]; });
+  if (fb === o.u && !Object.keys(fu).length) o.fb = o.fu = undefined; else { o.fb = fb; o.fu = fu; } // undefined (not delete): Object.assign onto the stored order must clear old values
+}
+// after = the order as it is now saved, before = its previous state (null for a new order)
+function stampOrder(after, before, now) {
+  after.u = now;
+  if (!before) { after.fb = after.fu = undefined; return; }
+  const times = {}; OFIELDS.forEach(f => { times[f] = fVal(before, f) === fVal(after, f) ? fTime(before, f) : now; });
+  packTimes(after, times);
+}
+function editOrder(o, fn) { const before = { ...o }; fn(o); stampOrder(o, before, nowIso()); }
+function mergeOrder(l, o) {
+  const m = { ...l }, times = {}; let theirs = false, mine = false;
+  OFIELDS.forEach(f => {
+    const tl = fTime(l, f), to = fTime(o, f), diff = fVal(l, f) !== fVal(o, f);
+    if (diff && to > tl) { m[f] = o[f]; if (f === 'status') m.doneAt = o.doneAt; theirs = true; } else if (diff) mine = true;
+    times[f] = to > tl ? to : tl;
+  });
+  m.u = (o.u || '') > (l.u || '') ? o.u : l.u; packTimes(m, times);
+  return { m, theirs, both: theirs && mine };
+}
 function pruneTomb() { const cut = new Date(Date.now() - 365 * 864e5).toISOString(); Object.keys(db.tomb).forEach(k => { if (db.tomb[k] < cut) delete db.tomb[k]; }); }
 // The file carries orders (customers, history, queue status), deletions and points adjustments - never stock.
 function buildOrdersFile() { return { kind: 'orders', v: 1, t: nowIso(), orders: db.orders, tomb: db.tomb, adj: db.adj, adjAt: db.adjAt }; }
@@ -1379,11 +1496,13 @@ function planMerge(d) {
   const tomb = { ...db.tomb }; Object.entries(inc.tomb).forEach(([id, t]) => { if (!tomb[id] || t > tomb[id]) tomb[id] = t; });
   const local = new Map(db.orders.map(o => [o.id, o]));
   const soon = new Date(Date.now() + 10 * 60e3).toISOString();
-  const plan = { add: [], upd: [], del: [], same: 0, skipped: 0, tomb, adj: {}, adjAt: {}, badIds: d.orders.length - best.size, future: inc.orders.filter(o => o.u > soon).length, conflicts: [] };
+  const plan = { add: [], upd: [], del: [], same: 0, both: 0, skipped: 0, tomb, adj: {}, adjAt: {}, badIds: d.orders.length - best.size, future: inc.orders.filter(o => o.u > soon).length, conflicts: [] };
   inc.orders.forEach(o => {
     const tb = tomb[o.id], l = local.get(o.id);
     if (tb && tb >= (o.u || '')) { plan.skipped++; return; } // deleted on one of the phones after its last edit
-    if (!l) plan.add.push(o); else if ((o.u || '') > (l.u || '')) plan.upd.push(o); else plan.same++;
+    if (!l) { plan.add.push(o); return; }
+    const r = mergeOrder(l, o); // field by field: each field from the phone that changed it last
+    if (r.theirs) { plan.upd.push(r.m); if (r.both) plan.both++; } else plan.same++;
   });
   db.orders.forEach(l => { const tb = tomb[l.id]; if (tb && tb >= (l.u || '')) plan.del.push(l.id); });
   Object.entries(inc.adj).forEach(([ph, v]) => {
@@ -1415,11 +1534,11 @@ function mergePreview(d, name) {
     ${warns}
     <div class="group" style="padding:6px 14px">
       <div class="row" style="border:0"><span style="flex:1">ออเดอร์ใหม่ที่เพิ่มเข้ามา</span><b class="num">${plan.add.length}</b></div>
-      <div class="row"><span style="flex:1">อัปเดต (ฝั่งที่ส่งมาแก้ล่าสุดกว่า)</span><b class="num">${plan.upd.length}</b></div>
+      <div class="row"><span style="flex:1">อัปเดตจากไฟล์ (ช่องที่อีกเครื่องแก้ล่าสุด)${plan.both ? `<br><small class="muted">${plan.both} ออเดอร์ถูกแก้ทั้งสองเครื่อง: เก็บการแก้ของทั้งสองฝั่ง ช่องเดียวกันใช้ค่าที่แก้ล่าสุด</small>` : ''}</span><b class="num">${plan.upd.length}</b></div>
       <div class="row"><span style="flex:1">ลบ (ลบไว้อีกเครื่อง)</span><b class="num">${plan.del.length}</b></div>
       <div class="row"><span style="flex:1">ปรับแต้มสะสม</span><b class="num">${Object.keys(plan.adj).length}</b></div>
       <div class="row"><span style="flex:1">ไม่เปลี่ยนแปลง (เครื่องนี้ใหม่กว่าหรือเท่ากัน)</span><b class="num">${plan.same}</b></div></div>
-    <p class="hint">รวมกับข้อมูลเดิมในเครื่องนี้ ไม่ทับทั้งหมด และไม่แตะสต็อก ถ้าออเดอร์เดียวกันถูกแก้ทั้งสองเครื่อง จะใช้อันที่แก้ล่าสุด (ดูจากเวลาเครื่อง จึงควรตั้งเวลาทั้งสองเครื่องให้ตรงกัน) ระบบเก็บสำเนาก่อนรวมไว้ให้ย้อนกลับได้ที่เมนู "⋯"</p>
+    <p class="hint">รวมกับข้อมูลเดิมในเครื่องนี้ ไม่ทับทั้งหมด และไม่แตะสต็อก ถ้าออเดอร์เดียวกันถูกแก้ทั้งสองเครื่อง ระบบจะรวมรายช่อง แต่ละช่องใช้ค่าที่แก้ล่าสุด (ดูจากเวลาเครื่อง จึงควรตั้งเวลาทั้งสองเครื่องให้ตรงกัน) ระบบเก็บสำเนาก่อนรวมไว้ให้ย้อนกลับได้ที่เมนู "⋯"</p>
     <div class="actions"><button class="btn primary block" data-act="mergego" ${changes ? '' : 'disabled style="opacity:.5"'}>${changes ? 'รวมข้อมูล' : 'ไม่มีอะไรต้องรวม'}</button></div>`);
 }
 
@@ -1429,6 +1548,7 @@ document.addEventListener('click', async e => {
   if (!t) { if (e.target.classList.contains('layer')) closeLayer(Number(e.target.id.slice(1))); return; }
   const a = t.dataset.act, v = t.dataset.v;
   switch (a) {
+    case 'more': ui.lim += PAGE; render(); break;
     case 'fcolor': ui.color = ui.color === v ? null : v; render(); break;
     case 'fsize': ui.size = ui.size === v ? null : v; render(); break;
     case 'src': ui.src = v; ui.cat = ui.color = ui.size = null; ui.gone = false; render(); break;
@@ -1458,7 +1578,12 @@ document.addEventListener('click', async e => {
     case 'delo': {
       const o = db.orders.find(x => x.id === t.dataset.id); if (!o) break;
       const nph = orderPhotoKeys(o.id);
-      if (confirm(`ลบออเดอร์วันที่ ${fmtDate(o.date)}?${nph.length ? `\nรูปถ่าย ${nph.length} รูปของออเดอร์นี้จะถูกลบด้วย` : ''}`)) { db.orders = db.orders.filter(x => x !== o); db.tomb[o.id] = nowIso(); pruneTomb(); save(); nph.forEach(removeImage); render(); renderCustDetail(); }
+      if (confirm(`ลบออเดอร์วันที่ ${fmtDate(o.date)}?${nph.length ? `\nรูปถ่าย ${nph.length} รูปของออเดอร์นี้จะถูกลบด้วย` : ''}`)) {
+        const before = JSON.stringify(db);
+        db.orders = db.orders.filter(x => x !== o); db.tomb[o.id] = nowIso(); pruneTomb();
+        if (save()) nph.forEach(removeImage); else revertTo(before); // photos go only once the deletion is really stored
+        render(); renderCustDetail();
+      }
       break;
     }
     case 'addophoto': $('#of-file').click(); break;
@@ -1474,9 +1599,9 @@ document.addEventListener('click', async e => {
     case 'qsort': ui.qsort = v; render(); break;
     case 'done': { buzz(); setJobStatus(t.dataset.id, 'done'); toast('บันทึกแล้ว ขึ้นเอ็นเสร็จเรียบร้อย'); break; }
     case 'undo': setJobStatus(t.dataset.id, 'wait'); toast('ย้อนกลับเป็นรอทำแล้ว'); break;
-    case 'urg': { const o = db.orders.find(x => x.id === t.dataset.id); if (o) { o.urgent = !o.urgent; o.u = nowIso(); save(); render(); if (!$('#l1').hidden && ui.cust) renderCustDetail(); } break; }
+    case 'urg': { const o = db.orders.find(x => x.id === t.dataset.id); if (o) { editOrder(o, x => { x.urgent = !x.urgent; }); save(); render(); if (!$('#l1').hidden && ui.cust) renderCustDetail(); } break; }
     case 'opaid': of.paid = t.dataset.v === '1'; document.querySelectorAll('#of-paid button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === of.paid)); break;
-    case 'pay': { const o = db.orders.find(x => x.id === t.dataset.id); if (o) { o.paid = !o.paid; o.u = nowIso(); save(); render(); if (!$('#l1').hidden && ui.cust) renderCustDetail(); } break; }
+    case 'pay': { const o = db.orders.find(x => x.id === t.dataset.id); if (o) { editOrder(o, x => { x.paid = !x.paid; }); save(); render(); if (!$('#l1').hidden && ui.cust) renderCustDetail(); } break; }
     case 'ost': of.status = v; document.querySelectorAll('#of-status button').forEach(b => b.classList.toggle('on', b.dataset.v === of.status)); break;
     case 'pd': { const d = new Date(); d.setDate(d.getDate() + Number(t.dataset.n)); $('#of-pickup').value = ymd(d); break; }
     case 'tgl': { const g = t.dataset.g; of.opts[g] = of.opts[g] === t.dataset.on ? t.dataset.off : t.dataset.on; syncOpts(); break; }
@@ -1521,7 +1646,7 @@ document.addEventListener('click', async e => {
         t: $('#of-t').value.trim(), t2: $('#of-t2').value.trim(), unit: of.unit, date: $('#of-date').value || today(), note: $('#of-note').value.trim(), free: $('#of-free').checked ? goal() : 0, skip: of.opts.skip, knot: of.opts.knot, pre: of.opts.pre, pickup: $('#of-pickup').value };
       if (!rec.racket && !rec.string && !rec.t) { toast('กรอกไม้ เอ็น หรือค่าเอ็นอย่างน้อย 1 อย่าง'); return; }
       const prev = of.id ? db.orders.find(x => x.id === of.id) : null;
-      rec.urgent = $('#of-urgent').checked; rec.paid = of.paid; rec.status = rec.t ? of.status : ''; rec.u = nowIso();
+      rec.urgent = $('#of-urgent').checked; rec.paid = of.paid; rec.status = rec.t ? of.status : '';
       rec.doneAt = rec.status === 'done' ? ((prev && prev.doneAt) || new Date().toISOString()) : '';
       if (rec.free) {
         const P = pts(customers().find(x => x.phone === phone) || { phone, orders: [] }, of.id);
@@ -1529,9 +1654,17 @@ document.addEventListener('click', async e => {
         if (of.id) { const old = db.orders.find(x => x.id === of.id); if (old && old.free) rec.free = old.free; }
       }
       const oid = of.id || uid();
-      if (of.id) Object.assign(db.orders.find(x => x.id === of.id), rec); else db.orders.push({ id: oid, ...rec });
+      const cur = of.id && db.orders.find(x => x.id === of.id); // may be missing after a reload from another window: then it is stored again
+      stampOrder(rec, cur || null, nowIso());
+      const before = JSON.stringify(db), oldPhone = cur ? cur.phone : '';
+      if (cur) Object.assign(cur, rec); else db.orders.push({ id: oid, ...rec });
+      // the customer's last order moved to another number (a typo fixed): hand-set points follow it, and the old number is set to 0
+      // with a fresh time, so a merge with the other phone moves them there too instead of bringing them back
+      const movePts = oldPhone && oldPhone !== phone && !db.orders.some(x => x.phone === oldPhone) && db.adj[oldPhone] ? db.adj[oldPhone] : 0;
+      if (movePts) { db.adj[phone] = (db.adj[phone] || 0) + movePts; db.adj[oldPhone] = 0; db.adjAt[phone] = db.adjAt[oldPhone] = nowIso(); }
       const saved = save(); of.id = oid; // from here a retry edits this same order instead of adding another
-      if (!saved) return; // save() already told the user; keep the form (and its photos) open so nothing is lost
+      if (!saved) { revertTo(before); return; } // save() already told the user; keep the form (and its photos) open so nothing is lost - a retry saves it again
+      if (movePts) toast(`ย้ายแต้มที่ปรับเอง ${movePts > 0 ? '+' : ''}${movePts} ไปเบอร์ใหม่แล้ว`, 3500);
       const { add: addPh, rm: rmPh } = opend; opend = { add: [], rm: new Set() };
       let phFail = 0;
       for (const k of rmPh) await removeImage(k);
@@ -1552,9 +1685,11 @@ document.addEventListener('click', async e => {
       const name = $('#pf-name').value.trim(); if (!name) { toast('กรุณาใส่ชื่อสินค้า'); return; }
       const sku = $('#pf-sku').value.trim(), category = $('#pf-cat').value.trim(), id = t.dataset.id;
       let pid = id;
-      if (id) { const p = product(id); p.name = name; p.sku = sku; p.category = category; }
-      else { const p = { id: uid(), name, sku, category, variants: [] }; pid = p.id; db.products.unshift(p); ui.open = p.id; ui.src = 'own'; ui.cat = ui.color = ui.size = null; }
-      save();
+      const before = JSON.stringify(db);
+      if (id) { const p = product(id); if (!p) { toast('ไม่พบสินค้านี้แล้ว (อาจถูกลบจากหน้าต่างอื่น)'); closeLayer(2); break; } p.name = name; p.sku = sku; p.category = category; }
+      else { const p = { id: uid(), name, sku, category, variants: [] }; pid = p.id; db.products.unshift(p); }
+      if (!save()) { revertTo(before); return; } // keep the form open; the photo is neither stored nor removed
+      if (!id) { ui.open = pid; ui.src = 'own'; ui.cat = ui.color = ui.size = null; }
       try {
         if (pendingPhoto) await setImage(pid, pendingPhoto);
         else if (pendingPhoto === null) await removeImage(pid);
@@ -1563,7 +1698,11 @@ document.addEventListener('click', async e => {
     }
     case 'delp': {
       const p = product(t.dataset.id); if (!p) break;
-      if (confirm(`ลบ "${p.name}" และสต็อกทั้งหมดของสินค้านี้?`)) { db.products = db.products.filter(x => x !== p); save(); removeImage(p.id); closeLayer(2); closeLayer(1); }
+      if (confirm(`ลบ "${p.name}" และสต็อกทั้งหมดของสินค้านี้?`)) {
+        const before = JSON.stringify(db); db.products = db.products.filter(x => x !== p);
+        if (!save()) { revertTo(before); break; } // not stored: keep the product and its photo
+        removeImage(p.id); closeLayer(2); closeLayer(1);
+      }
       break;
     }
     case 'pickphoto': $('#pf-file').click(); break;
@@ -1601,6 +1740,7 @@ document.addEventListener('click', async e => {
     case 'export': {
       const blob = new Blob([JSON.stringify({ kind: 'data', v: 2, ...db })], { type: 'application/json' });
       if (await saveFile(`stock-backup-${today()}.json`, blob)) { db.settings.lastBackup = new Date().toISOString(); save(); toast('สำรองข้อมูลแล้ว (ไม่รวมรูป ใช้ "สำรองรูปสินค้า" แยกต่างหาก)', 4000); }
+      else toast('ยกเลิกการสำรองข้อมูล (ยังไม่นับว่าสำรองแล้ว)');
       break;
     }
     case 'exportph': {
@@ -1624,7 +1764,13 @@ document.addEventListener('click', async e => {
       if (applyMerge(plan)) { closeLayer(2); render(); toast(`รวมข้อมูลแล้ว: ใหม่ ${plan.add.length} · อัปเดต ${plan.upd.length} · ลบ ${plan.del.length}`, 4000); }
       break;
     }
-    case 'badexport': { let raw = null; try { raw = localStorage.getItem(BAD_KEY); } catch {} if (raw) await saveFile('stock-unreadable-data.txt', new Blob([raw], { type: 'text/plain' })); break; }
+    case 'badexport': {
+      let raw = badRaw; if (raw === null) try { raw = localStorage.getItem(BAD_KEY); } catch {}
+      if (raw && await saveFile('stock-unreadable-data.txt', new Blob([raw], { type: 'text/plain' })) && badRaw !== null) {
+        badRaw = null; closeLayer(2); toast('ส่งออกข้อมูลเดิมแล้ว ตอนนี้บันทึกข้อมูลได้ตามปกติ (หรือกู้คืนจากไฟล์สำรอง)', 5000);
+      }
+      break;
+    }
     case 'prevrestore': {
       const pv = prevInfo(); if (!pv) break;
       if (!confirm(`กลับไปใช้สำเนาอัตโนมัติเมื่อ ${fmtDT(pv.t)} (${pv.why})?\nข้อมูลปัจจุบันจะถูกแทนที่ รูปสินค้าไม่เปลี่ยน`)) break;
@@ -1633,6 +1779,7 @@ document.addEventListener('click', async e => {
       if (pv.noSnaps) db.snaps = cur.snaps; // the copy was stored without sales snapshots, keep the current ones
       if (!save()) { db = cur; break; }
       ui.src = db.products.some(x => x.pk) ? 'pos' : 'own'; ui.cat = ui.color = ui.size = ui.cust = null; ui.gone = false; closeLayer(2); render(); toast('ย้อนกลับแล้ว');
+      loadImgs(false).catch(() => {}); // photos of the restored items are still on the device (see prevOwns)
       break;
     }
     case 'gonezero':
@@ -1641,14 +1788,13 @@ document.addEventListener('click', async e => {
       if (!list.length) break;
       if (!confirm(a === 'gonezero' ? `ตั้งจำนวนเป็น 0 สำหรับ ${list.length} รายการที่ไม่พบในไฟล์ POS ล่าสุด?` : `ลบ ${list.length} รายการที่ไม่พบในไฟล์ POS ล่าสุด ถาวร?`)) break;
       if (!ensurePrev(a === 'gonezero' ? 'ก่อนตั้งเป็น 0 (ไม่พบใน POS)' : 'ก่อนลบรายการที่ไม่พบใน POS')) break;
-      const before = JSON.stringify(db); let dropImgs = [];
+      const before = JSON.stringify(db);
       if (a === 'gonezero') list.forEach(([, x]) => { x.qty = 0; });
       else {
         list.forEach(([pp, x]) => { pp.variants = pp.variants.filter(y => y !== x); });
-        dropImgs = db.products.filter(pp => pp.pk && !pp.variants.length).map(pp => pp.id);
-        db.products = db.products.filter(pp => !pp.pk || pp.variants.length);
+        db.products = db.products.filter(pp => !pp.pk || pp.variants.length); // photos of removed products stay while the safety copy needs them
       }
-      if (save()) dropImgs.forEach(removeImage); else revertTo(before);
+      if (!save()) revertTo(before);
       ui.gone = false; render(); break;
     }
     case 'import': $('#importFile').click(); break;
@@ -1659,7 +1805,7 @@ document.addEventListener('click', async e => {
       if (!ensurePrev('ก่อนนำเข้า POS')) break;
       const before = JSON.stringify(db);
       const applied = applyPos(plan, mode), ok = applied && takeSnapshot(plan.fileName);
-      if (applied) (plan.dropImgs || []).forEach(removeImage); else revertTo(before); // applied = stock saved; only the snapshot may still have failed
+      if (!applied) revertTo(before); // applied = stock saved; only the snapshot may still have failed
       posPlan = null; closeLayer(2); ui.src = 'pos'; ui.cat = ui.color = ui.size = null; ui.gone = false;
       if (ui.tab !== 'stock') setTab('stock'); else render();
       if (ok) toast(`นำเข้าแล้ว: สินค้าใหม่ ${d.newP} · สี/ไซส์ใหม่ ${d.newV} · อัปเดต ${d.upd}`, 3500);
@@ -1668,7 +1814,9 @@ document.addEventListener('click', async e => {
     case 'wipe':
       if (confirm('ลบข้อมูลสินค้า ลูกค้า และรูปทั้งหมด?\nระบบเก็บสำเนาข้อมูล (ไม่รวมรูป) ไว้ให้ย้อนกลับได้ แต่รูปสินค้าจะถูกลบถาวร ควรสำรองรูปก่อน')) {
         if (!ensurePrev('ก่อนลบข้อมูลทั้งหมด')) break;
-        db = normalizeDb({ settings: db.settings }).db; save(); closeLayer(2);
+        const cur = db; db = normalizeDb({ settings: db.settings }).db;
+        if (!save()) { db = cur; break; } // the data could not be cleared, so the photos must stay too
+        closeLayer(2);
         ui.src = 'own'; ui.cat = ui.color = ui.size = ui.cust = null; ui.gone = false;
         imgs.forEach(u => URL.revokeObjectURL(u)); imgs.clear();
         try { await idbRun('readwrite', s => s.clear()); } catch {}
@@ -1704,7 +1852,8 @@ document.addEventListener('change', async e => {
     } catch { toast('เปิดรูปนี้ไม่ได้ ลองรูปอื่น'); }
   }
 });
-$('#search').addEventListener('input', e => { if (ui.tab === 'stock') ui.q = e.target.value; else ui.cq = e.target.value; render(); });
+let searchTimer = 0; // redraw once typing pauses, not on every key
+$('#search').addEventListener('input', e => { if (ui.tab === 'stock') ui.q = e.target.value; else ui.cq = e.target.value; clearTimeout(searchTimer); searchTimer = setTimeout(render, 120); });
 document.addEventListener('input', e => {
   if (e.target.id === 'of-phone') updatePhoneHint();
   if (e.target.id === 'of-t') updatePts();
@@ -1752,23 +1901,18 @@ $('#importFile').addEventListener('change', async e => {
   }
   let failed = 0;
   for (const [id, blob] of blobs) if (imgOwned(id)) { try { await setImage(id, blob); } catch { failed++; } }
-  if (norm) for (const id of [...imgs.keys()]) if (!imgOwned(id)) await removeImage(id);
+  if (norm) await loadImgs(false).catch(() => {}); // photos of items not in the file stay on the device, so "undo" can bring them back
   closeLayer(2); render();
   toast(failed ? `กู้คืนแล้ว แต่รูปไม่สำเร็จ ${failed} รูป` : 'กู้คืนข้อมูลแล้ว', 3500);
 });
 
 render();
-(async () => {
-  try {
-    // photos nobody owns are cleaned up, but never when the data looks empty or unreadable (the photos may be all that is left)
-    const clean = !loadNotice && !skipClean && (db.products.length > 0 || db.orders.length > 0);
-    for (const [id, blob] of await idbAll()) { if (imgOwned(id)) imgs.set(id, URL.createObjectURL(blob)); else if (clean) removeImage(id); }
-    if (imgs.size) render();
-  } catch {}
-})();
+// photos nobody owns are cleaned up, but never when the data looks empty or unreadable (the photos may be all that is left)
+loadImgs(!loadNotice && !skipClean && (db.products.length > 0 || db.orders.length > 0)).catch(() => {});
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}
-if (loadNotice) toast('อ่านข้อมูลเดิมไม่ได้ ระบบเก็บสำเนาไว้แล้ว ดูที่เมนู "⋯" เพื่อส่งออกข้อมูลเดิม', 9000);
+if (badRaw !== null) toast('อ่านข้อมูลเดิมไม่ได้ และพื้นที่ในเครื่องไม่พอจะเก็บสำเนา กด "⋯" แล้วส่งออกข้อมูลเดิมก่อน จากนั้นจึงบันทึกหรือกู้คืนได้', 12000);
+else if (loadNotice) toast('อ่านข้อมูลเดิมไม่ได้ ระบบเก็บสำเนาไว้แล้ว ดูที่เมนู "⋯" เพื่อส่งออกข้อมูลเดิม', 9000);
 else if (db.products.length || db.orders.length) {
   const lb = db.settings.lastBackup, days = lb ? (Date.now() - new Date(lb)) / 864e5 : Infinity;
   if (days > 7) toast(lb ? `ยังไม่ได้สำรองข้อมูลมา ${Math.floor(days)} วัน` : 'ยังไม่เคยสำรองข้อมูล กด "⋯" แล้วเลือกสำรองข้อมูล', 5000);

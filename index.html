@@ -628,6 +628,8 @@ function pageLimit() {
   return ui.lim;
 }
 const moreBtn = rest => rest > 0 ? `<button class="btn ghost block" data-act="more" style="margin-top:12px">แสดงเพิ่ม (อีก ${rest.toLocaleString()} รายการ)</button>` : '';
+// "รองเท้า-VS", "รองเท้า-VICTOR"... are separate POS categories; the chip "รองเท้า (รวม)" shows every brand at once so all sizes are visible together.
+const SHOE_ALL = 'รองเท้า (รวม)', inCat = (p, c) => c === SHOE_ALL ? /^รองเท้า-/.test(p.category || '') : p.category === c;
 const catRow = cats => cats.length > 1 ? `<div class="frow"><span class="lbl">หมวด</span>${cats.map(c =>
   `<button class="chip ${ui.cat === c ? 'on' : ''}" data-act="fcat" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : '';
 
@@ -636,8 +638,6 @@ const SNAP_MAX = 30;
 const dShort = iso => new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
 // A snapshot names each POS variant by a hash of "pk|vk", not by its random id, so the history survives a delete + re-import of that row.
 // (pk includes the category; applyPos re-keys the snapshots when a product's category changes in POS.)
-// "รองเท้า-VS", "รองเท้า-VICTOR"... are separate POS categories; the chip "รองเท้า (รวม)" shows every brand at once so all sizes are visible together.
-const SHOE_ALL = 'รองเท้า (รวม)', inCat = (p, c) => c === SHOE_ALL ? /^รองเท้า-/.test(p.category || '') : p.category === c;
 function h53(s) {
   let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
   for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
@@ -780,6 +780,8 @@ function renderStock() {
   const salesView = ui.src === 'pos' && ui.sview === 'sales';
   const catN = new Map(); srcProducts.forEach(p => { if (p.category) catN.set(p.category, (catN.get(p.category) || 0) + 1); });
   const cats = [...catN.keys()].sort((a, b) => catN.get(b) - catN.get(a));
+  const shoeCats = cats.filter(c => /^รองเท้า-/.test(c));
+  if (shoeCats.length > 1) cats.unshift(SHOE_ALL);
   if (ui.cat && !cats.includes(ui.cat)) ui.cat = null;
   let scope = ui.cat ? srcProducts.filter(p => inCat(p, ui.cat)) : srcProducts;
   if (ui.gone && !salesView) scope = scope.filter(p => p.variants.some(v => v.gone));
@@ -788,8 +790,6 @@ function renderStock() {
   if (ui.size && !usedSizes(scope).includes(ui.size)) ui.size = null;
 
   const q = ui.q.trim().toLowerCase();
-  const shoeCats = cats.filter(c => /^รองเท้า-/.test(c));
-  if (shoeCats.length > 1) cats.unshift(SHOE_ALL);
   const rows = scope
     .map(p => ({ p, vs: p.variants.filter(v => (!ui.color || v.color === ui.color) && (!ui.size || v.size === ui.size)) }))
     .filter(({ p, vs }) => (!(ui.color || ui.size) || vs.length) && (!q || (p.name + ' ' + p.sku + ' ' + (p.category || '')).toLowerCase().includes(q)));

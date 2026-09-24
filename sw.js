@@ -1,4 +1,4 @@
-﻿const CACHE = 'stock-app-v36';
+﻿const CACHE = 'stock-app-v37';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './xlsx.mini.min.js'];
 const SLOW_MS = 3000;
 

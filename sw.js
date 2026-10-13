@@ -1,4 +1,4 @@
-﻿const CACHE = 'stock-app-v38';
+﻿const CACHE = 'stock-app-v39'; // keep in step with APP_VERSION in index.html
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './xlsx.mini.min.js'];
 const SLOW_MS = 3000;
 
